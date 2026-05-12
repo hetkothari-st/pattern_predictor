@@ -44,13 +44,6 @@ export function Watchlist() {
 
   return (
     <>
-      <div className="wl-head">
-        <span />
-        <span>Symbol</span>
-        <span>Trend</span>
-        <span>TF</span>
-        <span>Conf</span>
-      </div>
       {items.map((it) => {
         const active = it.symbol === symbol && it.tf === tf;
         const dotCls =
@@ -84,6 +77,7 @@ export function Watchlist() {
     </>
   );
 }
+
 
 function Spark({
   values,
