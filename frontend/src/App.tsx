@@ -4,6 +4,7 @@ import { DirectionBadge } from "./components/DirectionBadge";
 import { EarlySignalsFeed } from "./components/EarlySignalsFeed";
 import { GuidancePanel } from "./components/GuidancePanel";
 import { BookInsight } from "./components/BookInsight";
+import { CriticPanel } from "./components/CriticPanel";
 import { RobotWidget } from "./components/RobotWidget";
 import { SymbolPicker } from "./components/SymbolPicker";
 import { Watchlist } from "./components/Watchlist";
@@ -22,16 +23,25 @@ function fmtPrice(p: number | undefined) {
   return p.toFixed(6);
 }
 
+function fmtVol(v: number | undefined) {
+  if (v === undefined || !Number.isFinite(v)) return "—";
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(2) + "K";
+  return v.toFixed(0);
+}
+
 export function App() {
   const symbol = useStore((s) => s.symbol);
   const tf = useStore((s) => s.tf);
   const setSymbolTf = useStore((s) => s.setSymbolTf);
   const bars = useStore((s) => s.bars);
+  const detections = useStore((s) => s.detections);
+
   const [now, setNow] = useState(new Date());
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = (typeof window !== "undefined" && localStorage.getItem(THEME_KEY)) as Theme | null;
-    if (stored === "light" || stored === "dark") return stored;
-    return "dark";
+    return stored === "light" || stored === "dark" ? stored : "dark";
   });
 
   useEffect(() => {
@@ -63,69 +73,112 @@ export function App() {
   }, [bars]);
 
   const live = bars.length > 0;
-  const dir = stats && stats.change >= 0 ? "bull-c" : "bear-c";
+  const dirCls = stats && stats.change >= 0 ? "bull-c" : stats ? "bear-c" : "";
+  const arrow = stats && stats.change >= 0 ? "▲" : "▼";
+
+  const counts = useMemo(() => {
+    const arr = Object.values(detections);
+    return {
+      forming: arr.filter((d) => d.status === "forming").length,
+      done: arr.filter((d) => d.status === "completed").length,
+    };
+  }, [detections]);
 
   return (
     <div className="shell">
+      {/* row 1 — toolbar */}
       <header className="toolbar rise">
         <div className="brand">
           <div className="brand-mark">S</div>
           <div className="brand-col">
             <span className="brand-name">Sentinel</span>
-            <span className="brand-sub">Pattern Intelligence</span>
+            <span className="brand-sub">PI · v0.1</span>
           </div>
         </div>
 
-        <SymbolPicker />
+        <div className="toolbar-zone">
+          <SymbolPicker />
+        </div>
 
-        <span className="toolbar-sep" />
+        <div className="toolbar-zone flex">
+          <DirectionBadge />
+        </div>
 
-        <DirectionBadge />
+        <div className="toolbar-zone">
+          <span className="hint">
+            <span className="kbd">⌘</span>
+            <span className="kbd">K</span>
+            <span>Command</span>
+          </span>
+        </div>
 
-        <span className="toolbar-spacer" />
-
-        <button
-          className="icon-btn"
-          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-        </button>
+        <div className="toolbar-zone right">
+          <button
+            className="icon-btn"
+            title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
+        </div>
       </header>
 
+      {/* row 2 — tape */}
       <div className="tape rise rise-1">
-        <div className="tape-sym">
-          <span className="tape-sym-name">{symbol}</span>
-          <span className="tape-sym-tf">{tf}</span>
+        <div className="tape-main">
+          <div className="tape-sym">
+            <span className="tape-sym-name">{symbol}</span>
+            <div className="tape-sym-meta">
+              <span className="tape-sym-tf">{tf}</span>
+              <span className="tape-sym-tf">live</span>
+            </div>
+          </div>
+
+          <div className="tape-price">
+            <span className={`tape-price-last ${dirCls}`}>
+              {fmtPrice(stats?.last.close)}
+            </span>
+            <span className={`tape-price-delta ${dirCls}`}>
+              {stats && (
+                <>
+                  <span className={`tape-price-arrow ${dirCls}`}>{arrow}</span>
+                  <span>
+                    {stats.change >= 0 ? "+" : ""}
+                    {fmtPrice(stats.change)}
+                  </span>
+                  <span style={{ opacity: 0.7 }}>
+                    {stats.pct >= 0 ? "+" : ""}
+                    {stats.pct.toFixed(2)}%
+                  </span>
+                </>
+              )}
+              {!stats && <span style={{ color: "var(--text-3)" }}>awaiting feed</span>}
+            </span>
+          </div>
+
+          <div className="tape-stats">
+            <Stat label="Open"  value={fmtPrice(stats?.last.open)} />
+            <Stat label="High"  value={fmtPrice(stats?.hi)} cls="bull-c" />
+            <Stat label="Low"   value={fmtPrice(stats?.lo)} cls="bear-c" />
+            <Stat label="Vol"   value={fmtVol(stats?.vol)} />
+          </div>
         </div>
 
-        <div className="tape-stats">
-          <Stat label="Last" value={fmtPrice(stats?.last.close)} cls={dir} />
-          <Stat
-            label="Chg"
-            value={
-              stats
-                ? `${stats.change >= 0 ? "+" : ""}${fmtPrice(stats.change)} (${stats.pct >= 0 ? "+" : ""}${stats.pct.toFixed(2)}%)`
-                : "—"
-            }
-            cls={dir}
-          />
-          <Stat label="Open" value={fmtPrice(stats?.last.open)} />
-          <Stat label="High" value={fmtPrice(stats?.hi)} />
-          <Stat label="Low" value={fmtPrice(stats?.lo)} />
-          <Stat
-            label="Vol"
-            value={stats ? stats.vol.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}
-          />
-        </div>
-
-        <div className="tape-clock">
-          <span className={`live-dot ${live ? "" : "idle"}`} />
-          <span>{now.toISOString().substring(11, 19)} UTC</span>
+        <div className="tape-side">
+          <div className="tape-clock">
+            <span>{now.toISOString().substring(11, 19)}</span>
+            <span style={{ color: "var(--text-3)" }}>UTC</span>
+          </div>
+          <div className={`tape-conn ${live ? "" : "idle"}`}>
+            <span className={`live-dot ${live ? "" : "idle"}`} />
+            <span>Feed</span>
+            <b>{live ? "Connected" : "Idle"}</b>
+          </div>
         </div>
       </div>
 
+      {/* row 3 col 1 — chart */}
       <main className="chart-area rise rise-2">
         <div className="chart-toolbar">
           {(["1m", "5m", "15m", "1h", "4h", "1d"] as const).map((v) => (
@@ -137,44 +190,90 @@ export function App() {
               {v}
             </button>
           ))}
+          <span className="chart-tools-sep" />
+          <span className="chart-meta">{symbol} · {tf} · candles</span>
         </div>
         <div className="chart-canvas">
           <Chart theme={theme} />
+          <span className="bracket tl" />
+          <span className="bracket tr" />
+          <span className="bracket bl" />
+          <span className="bracket br" />
           <RobotWidget />
         </div>
       </main>
 
+      {/* row 3 col 2 — stacked side panel */}
       <aside className="aside rise rise-3">
-        <Watchlist />
-        <EarlySignalsFeed />
-        <GuidancePanel />
-        <BookInsight />
+        <div className="aside-body">
+          <Section title="Watch" count={null}>
+            <Watchlist />
+          </Section>
+          <Section title="Signals" count={counts.forming}>
+            <EarlySignalsFeed />
+          </Section>
+          <Section title="Playbook" count={counts.done}>
+            <GuidancePanel />
+          </Section>
+          <Section title="Reference" count={null}>
+            <BookInsight />
+          </Section>
+          <Section title="Critic" count={null}>
+            <CriticPanel />
+          </Section>
+        </div>
       </aside>
 
+      {/* row 4 — status bar */}
       <footer className="statusbar">
-        <div className={`statusbar-item ${live ? "ok" : ""}`}>
+        <div className="statusbar-item ok">
           <span className={`live-dot ${live ? "" : "idle"}`} />
-          <span>Feed</span>
-          <b>{live ? "Connected" : "Idle"}</b>
+          <span>Net</span>
+          <b>{live ? "OK" : "—"}</b>
         </div>
         <div className="statusbar-item">
           <span>Bars</span>
           <b>{bars.length}</b>
         </div>
         <div className="statusbar-item">
-          <span>Tape</span>
-          <b>{symbol} · {tf}</b>
+          <span>Forming</span>
+          <b>{counts.forming}</b>
+        </div>
+        <div className="statusbar-item">
+          <span>Confirmed</span>
+          <b>{counts.done}</b>
         </div>
         <span className="statusbar-spacer" />
-        <div className="statusbar-item">
+        <div className="statusbar-item right">
           <span>Engine</span>
           <b>v0.1</b>
         </div>
-        <div className="statusbar-item">
-          <span>{now.toLocaleTimeString("en-GB", { hour12: false })}</span>
+        <div className="statusbar-item right">
+          <b>{now.toLocaleTimeString("en-GB", { hour12: false })}</b>
         </div>
       </footer>
     </div>
+  );
+}
+
+function Section({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="section">
+      <header className="section-head">
+        <span className="section-bar" />
+        <span className="section-title">{title}</span>
+        {count !== null && count > 0 && <span className="section-count">{count}</span>}
+      </header>
+      <div className="section-body">{children}</div>
+    </section>
   );
 }
 

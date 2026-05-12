@@ -9,16 +9,8 @@ export function GuidancePanel() {
     .sort((a, b) => b.end_ts - a.end_ts);
   const top = completed[0];
 
-  return (
-    <section className="aside-section">
-      <div className="section-head">
-        <span className="section-head-bar" />
-        <span className="section-title">Playbook</span>
-      </div>
-      {!top && <div className="empty">No completed pattern in this session.</div>}
-      {top && <Card detection={top} guidance={guidanceMap[top.pattern]} />}
-    </section>
-  );
+  if (!top) return <div className="empty">No completed pattern in this session.</div>;
+  return <Card detection={top} guidance={guidanceMap[top.pattern]} />;
 }
 
 function Card({ detection, guidance }: { detection: Detection; guidance?: Guidance }) {
@@ -48,15 +40,21 @@ function Card({ detection, guidance }: { detection: Detection; guidance?: Guidan
             <div className="guide-stats">
               <div className="guide-stat accent">
                 <span className="guide-stat-label">Success</span>
-                <span className="guide-stat-val">{(guidance.success_rate * 100).toFixed(0)}%</span>
+                <span className="guide-stat-val">
+                  {(guidance.success_rate * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="guide-stat">
                 <span className="guide-stat-label">Avg Move</span>
-                <span className="guide-stat-val">{(guidance.avg_move * 100).toFixed(0)}%</span>
+                <span className="guide-stat-val">
+                  {(guidance.avg_move * 100).toFixed(0)}%
+                </span>
               </div>
               <div className="guide-stat">
                 <span className="guide-stat-label">Throwback</span>
-                <span className="guide-stat-val">{(guidance.throwback_pct * 100).toFixed(0)}%</span>
+                <span className="guide-stat-val">
+                  {(guidance.throwback_pct * 100).toFixed(0)}%
+                </span>
               </div>
             </div>
 

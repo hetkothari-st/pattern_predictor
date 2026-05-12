@@ -8,6 +8,7 @@ interface WatchlistItem {
   top_direction: "bullish" | "bearish" | null;
   top_confidence: number | null;
   top_status: "forming" | "completed" | null;
+  spark?: number[];
 }
 
 export function Watchlist() {
@@ -33,53 +34,108 @@ export function Watchlist() {
     };
   }, []);
 
-  return (
-    <section className="aside-section">
-      <div className="section-head">
-        <span className="section-head-bar" />
-        <span className="section-title">Watchlist</span>
-        <span className="section-count">{items.length}</span>
+  if (items.length === 0) {
+    return (
+      <div className="empty">
+        No streams subscribed. Configure <code>MT_SUBSCRIPTIONS</code> or POST a tick to begin.
       </div>
+    );
+  }
 
-      {items.length === 0 ? (
-        <div className="empty">
-          No streams subscribed. Configure <code>MT_SUBSCRIPTIONS</code> or POST a tick to begin.
-        </div>
-      ) : (
-        <>
-          <div className="wl-head">
-            <span />
-            <span>Symbol</span>
-            <span>TF</span>
-            <span>Conf</span>
-          </div>
-          <div>
-            {items.map((it) => {
-              const active = it.symbol === symbol && it.tf === tf;
-              const dotCls =
-                it.top_direction === "bullish"
-                  ? "dot bull"
-                  : it.top_direction === "bearish"
-                    ? "dot bear"
-                    : "dot idle";
-              return (
-                <button
-                  key={`${it.symbol}-${it.tf}`}
-                  onClick={() => setSymbolTf(it.symbol, it.tf)}
-                  className={`wl-row ${active ? "active" : ""}`}
-                >
-                  <span className={dotCls} />
-                  <span className="wl-sym">{it.symbol}</span>
-                  <span className="wl-tf">{it.tf}</span>
-                  <span className="wl-conf">
-                    {it.top_confidence !== null ? `${(it.top_confidence * 100).toFixed(0)}%` : "—"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </section>
+  return (
+    <>
+      <div className="wl-head">
+        <span />
+        <span>Symbol</span>
+        <span>Trend</span>
+        <span>TF</span>
+        <span>Conf</span>
+      </div>
+      {items.map((it) => {
+        const active = it.symbol === symbol && it.tf === tf;
+        const dotCls =
+          it.top_direction === "bullish"
+            ? "dot bull"
+            : it.top_direction === "bearish"
+              ? "dot bear"
+              : "dot idle";
+        const confCls =
+          it.top_direction === "bullish"
+            ? "wl-conf bull-c"
+            : it.top_direction === "bearish"
+              ? "wl-conf bear-c"
+              : "wl-conf";
+        return (
+          <button
+            key={`${it.symbol}-${it.tf}`}
+            onClick={() => setSymbolTf(it.symbol, it.tf)}
+            className={`wl-row ${active ? "active" : ""}`}
+          >
+            <span className={dotCls} />
+            <span className="wl-sym">{it.symbol}</span>
+            <Spark values={it.spark} direction={it.top_direction} />
+            <span className="wl-tf">{it.tf}</span>
+            <span className={confCls}>
+              {it.top_confidence !== null ? `${(it.top_confidence * 100).toFixed(0)}%` : "—"}
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+function Spark({
+  values,
+  direction,
+}: {
+  values?: number[];
+  direction: "bullish" | "bearish" | null;
+}) {
+  const W = 60;
+  const H = 20;
+  const color =
+    direction === "bullish"
+      ? "var(--bull)"
+      : direction === "bearish"
+        ? "var(--bear)"
+        : "var(--text-3)";
+
+  const vs = values && values.length >= 2 ? values : null;
+  if (!vs) {
+    return (
+      <svg className="wl-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+        <line
+          x1="0"
+          y1={H / 2}
+          x2={W}
+          y2={H / 2}
+          stroke="var(--line-2)"
+          strokeWidth="1"
+          strokeDasharray="2 2"
+        />
+      </svg>
+    );
+  }
+
+  const min = Math.min(...vs);
+  const max = Math.max(...vs);
+  const range = max - min || 1;
+  const stepX = W / (vs.length - 1);
+  const pts = vs
+    .map((v, i) => `${(i * stepX).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
+    .join(" ");
+
+  return (
+    <svg className="wl-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

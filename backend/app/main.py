@@ -12,6 +12,7 @@ from sqlmodel import Session, func, select
 
 from .bars import store
 from .config import settings
+from .critic import critique
 from .knowledge.rag import book_insight, get_guidance
 from .learning.outcomes import PredictionRow, _get_engine
 from .messages import Tick, WSOut
@@ -72,6 +73,27 @@ async def insight(pattern: str = Query(...)) -> dict:
     isn't loaded yet."""
     facets = book_insight(pattern) or {}
     return {"pattern": pattern, "facets": facets}
+
+
+@app.get("/api/critique")
+async def critique_endpoint(
+    symbol: str = Query(...),
+    tf: str = Query("1m"),
+    pattern: str = Query(...),
+) -> dict:
+    """Run the LLM critic against the most recent detection of the given
+    pattern in this stream. Falls back to a disabled stub if no API key is
+    set or no matching detection exists."""
+    memo = engine._memo_for(symbol, tf)
+    target = next(
+        (d for d in memo.active.values() if d.pattern == pattern),
+        None,
+    )
+    if target is None:
+        return {"available": False, "reason": "No active detection for this pattern."}
+    bars = store.get(symbol, tf).snapshot()
+    verdict = critique(target, bars)
+    return {"available": True, "pattern": pattern, **verdict}
 
 
 @app.get("/api/bars")

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     ohlcv_dir: str = "../data/ohlcv"
     chroma_dir: str = "../data/chroma"
     chroma_collection: str = "bulkowski"
+    # Anthropic API key for the LLM critic (optional — when missing, the
+    # critic endpoint returns a "disabled" verdict).
+    anthropic_api_key: str = ""
+    critic_model: str = "claude-opus-4-7"
 
 
 settings = Settings()
