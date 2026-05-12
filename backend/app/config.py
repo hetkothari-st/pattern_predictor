@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # 2=Depth. Symbol is what surfaces in the chart UI.
     # Example: [{"Tkn":"26000","Xchg":"NSE","Symbol":"NIFTY50","FeedType":1}]
     mt_subscriptions: str = ""
+    # When true, every closed bar is appended to data/ohlcv/{symbol}_{tf}.csv
+    # so live runs accumulate a training corpus for app.ml.train.
+    record_ohlcv: bool = False
+    ohlcv_dir: str = "../data/ohlcv"
 
 
 settings = Settings()

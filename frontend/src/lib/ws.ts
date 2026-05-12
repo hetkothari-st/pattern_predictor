@@ -1,11 +1,13 @@
 import type { WSMessage } from "../types";
 import { useStore } from "../state/store";
+import { maybeAlert, resetAlerts } from "./alert";
 
 export function connectStream(symbol: string, tf: string): () => void {
   const url = `ws://${window.location.host}/ws/stream?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(tf)}`;
   let ws: WebSocket | null = null;
   let stopped = false;
   let backoff = 500;
+  resetAlerts();
 
   const open = () => {
     ws = new WebSocket(url);
@@ -18,7 +20,10 @@ export function connectStream(symbol: string, tf: string): () => void {
         const s = useStore.getState();
         if (msg.type === "snapshot") s.applySnapshot(msg.payload.bars, msg.payload.detections, msg.payload.guidance);
         else if (msg.type === "bar") s.applyBar(msg.payload);
-        else if (msg.type === "detection") s.applyDetection(msg.payload);
+        else if (msg.type === "detection") {
+          s.applyDetection(msg.payload);
+          maybeAlert(symbol, msg.payload);
+        }
         else if (msg.type === "guidance") s.applyGuidance(msg.payload);
       } catch {
         /* ignore parse errors */

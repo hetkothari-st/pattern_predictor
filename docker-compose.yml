@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    container_name: pp-backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./data:/app/../data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: pp-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped

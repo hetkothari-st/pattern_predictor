@@ -6,9 +6,13 @@ export function EarlySignalsFeed() {
     .filter((d) => d.status === "forming")
     .sort((a, b) => b.confidence - a.confidence);
   return (
-    <div style={{ padding: 12, overflow: "auto", flex: 1 }}>
-      <h3 style={{ margin: "0 0 8px" }}>Watching for</h3>
-      {forming.length === 0 && <div style={{ opacity: 0.6 }}>Nothing pre-pattern right now.</div>}
+    <div style={{ padding: 12, overflow: "auto", flex: 1, borderTop: "1px solid #1f2937" }}>
+      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: 0.5 }}>
+        WATCHING FOR
+      </div>
+      {forming.length === 0 && (
+        <div style={{ opacity: 0.5, fontSize: 13 }}>Nothing pre-pattern right now.</div>
+      )}
       {forming.map((d) => (
         <div
           key={d.id}

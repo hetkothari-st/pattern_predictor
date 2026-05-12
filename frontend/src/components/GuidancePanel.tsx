@@ -10,9 +10,13 @@ export function GuidancePanel() {
   const top = completed[0];
 
   return (
-    <div style={{ padding: 12, borderTop: "1px solid #30363d" }}>
-      <h3 style={{ margin: "0 0 8px" }}>Guidance</h3>
-      {!top && <div style={{ opacity: 0.6 }}>No completed pattern yet.</div>}
+    <div style={{ padding: 12, borderTop: "1px solid #1f2937", overflowY: "auto" }}>
+      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: 0.5 }}>
+        GUIDANCE
+      </div>
+      {!top && (
+        <div style={{ opacity: 0.5, fontSize: 13 }}>No completed pattern yet.</div>
+      )}
       {top && <Card detection={top} guidance={guidanceMap[top.pattern]} />}
     </div>
   );

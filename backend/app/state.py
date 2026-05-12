@@ -16,6 +16,7 @@ from .knowledge.rag import get_guidance
 from .learning.outcomes import log_detection, score_outcomes
 from .messages import AnchorPoint, Bar, Detection, Tick, WSOut
 from .ml import infer as ml_infer
+from .recorder import record_bar
 from .ws_broadcast import hub
 
 EARLY_THRESHOLD = 0.55  # min ML probability to emit a "watching for X" signal
@@ -59,6 +60,8 @@ class Engine:
             await hub.publish(
                 tick.symbol, tf, WSOut(type="bar", payload=bar.model_dump())
             )
+            if bar.closed:
+                record_bar(bar)
         if any(b.closed for b in emitted_bars):
             # Run detectors only on bar-close to keep CPU bounded.
             await self._run_detectors(tick.symbol, tf, stream.snapshot())

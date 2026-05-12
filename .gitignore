@@ -11,4 +11,10 @@ data/models/*.pt
 data/predictions.sqlite
 data/bulkowski.pdf
 data/chroma/
+data/sample.csv
+data/ohlcv/
 .DS_Store
+.playwright-mcp/
+verify_pattern.png
+backend/app/knowledge/patterns_extracted.yaml
+frontend/tsconfig.tsbuildinfo

@@ -54,10 +54,26 @@ PATTERN_ALIASES: dict[str, str] = {
     "cup-with-handle": "cup_with_handle",
 }
 
-PAT_SUCCESS = re.compile(r"(success(?: rate)?|reliability)\D{0,15}(\d{1,3})\s*%", re.I)
+# Bulkowski uses several stable phrasings for the per-pattern statistics
+# tables. We match the most common ones; whichever hits first per pattern is
+# what we record.
+PAT_SUCCESS_DIRECT = re.compile(
+    r"(?:percentage meeting price target|success(?: rate)?|reliability)\D{0,15}(\d{1,3})\s*%",
+    re.I,
+)
+# "Breakeven failure rate XX%" — invert to a success rate.
+PAT_FAILURE = re.compile(r"breakeven failure rate\D{0,15}(\d{1,3})\s*%", re.I)
 PAT_AVG_MOVE = re.compile(r"average (?:rise|decline|move)\D{0,15}(\d{1,3})\s*%", re.I)
-PAT_THROWBACK = re.compile(r"(throwback|pullback)\D{0,15}(\d{1,3})\s*%", re.I)
-PAT_CHAPTER = re.compile(r"^\s*(?:chapter\s+\d+[:\.\s-]+|)([A-Z][A-Za-z,\-\s]{4,60})\s*$", re.M)
+PAT_THROWBACK = re.compile(r"(?:throwback|pullback)(?:\s+rate)?\D{0,15}(\d{1,3})\s*%", re.I)
+# Bulkowski's chapter heads look like:
+#   "39 Head-and-Shoulders Bottoms 585"
+# (chapter number, title, page number). The "Chapter N — Title" form also
+# exists in some editions. Require a leading number to avoid matching every
+# inline mention of a pattern in the prose.
+PAT_CHAPTER = re.compile(
+    r"^\s*(?:chapter\s+)?\d{1,3}[:\.\s\-]+([A-Z][A-Za-z,\-\s]{4,60}?)(?:\s+\d{1,4})?\s*$",
+    re.M | re.I,
+)
 
 
 def parse_pdf_to_chapters(pdf_path: Path) -> list[tuple[str, str]]:
@@ -120,15 +136,20 @@ def _is_clean_sentence(s: str) -> bool:
 
 def extract_stats(body: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    m = PAT_SUCCESS.search(body)
+    m = PAT_SUCCESS_DIRECT.search(body)
     if m:
-        out["success_rate"] = int(m.group(2)) / 100.0
+        out["success_rate"] = int(m.group(1)) / 100.0
+    else:
+        # Fall back to Bulkowski's "breakeven failure rate" — invert it.
+        m = PAT_FAILURE.search(body)
+        if m:
+            out["success_rate"] = max(0.0, 1.0 - int(m.group(1)) / 100.0)
     m = PAT_AVG_MOVE.search(body)
     if m:
         out["avg_move"] = int(m.group(1)) / 100.0
     m = PAT_THROWBACK.search(body)
     if m:
-        out["throwback_pct"] = int(m.group(2)) / 100.0
+        out["throwback_pct"] = int(m.group(1)) / 100.0
     # Intentionally do NOT overwrite summary/source_quote here. The seeded
     # prose in patterns.yaml is curated; PDF text extraction reliably leaks
     # page numbers, figure captions, and TOC fragments that read worse than
@@ -177,10 +198,32 @@ def maybe_index_chroma(chapters: list[tuple[str, str]], chroma_path: Path) -> No
         print(f"Indexed {len(ids)} chunks into {chroma_path}")
 
 
+def _is_sane(stats: dict[str, Any]) -> bool:
+    """Reject stat blocks that landed outside plausible ranges — the parser
+    occasionally grabs the worst-case row from a multi-row table.
+    """
+    sr = stats.get("success_rate")
+    if sr is not None and not (0.30 <= sr <= 0.85):
+        return False
+    am = stats.get("avg_move")
+    if am is not None and not (0.05 <= am <= 0.60):
+        return False
+    tp = stats.get("throwback_pct")
+    if tp is not None and not (0.20 <= tp <= 0.80):
+        return False
+    return True
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdf", required=True, help="Path to the Encyclopedia of Chart Patterns PDF")
     ap.add_argument("--out", default="app/knowledge/patterns.yaml")
+    ap.add_argument(
+        "--apply",
+        action="store_true",
+        help="Merge sane extracted stats into --out. Without this flag, only "
+        "writes app/knowledge/patterns_extracted.yaml for manual review.",
+    )
     ap.add_argument("--chroma", default=None, help="Optional path for Chroma index")
     args = ap.parse_args()
 
@@ -191,15 +234,31 @@ def main() -> None:
     chapters = parse_pdf_to_chapters(pdf)
     print(f"Found {len(chapters)} mappable chapters.")
 
-    updates: dict[str, dict[str, Any]] = {}
+    # If a chapter shows up multiple times (table of contents + actual chapter),
+    # concatenate the bodies before extracting so we don't drop a fragment that
+    # has the table buried in it.
+    by_key: dict[str, str] = {}
     for title, body in chapters:
         key = PATTERN_ALIASES[title]
+        by_key[key] = by_key.get(key, "") + "\n" + body
+    raw_updates: dict[str, dict[str, Any]] = {}
+    sane_updates: dict[str, dict[str, Any]] = {}
+    for key, body in by_key.items():
         stats = extract_stats(body)
-        if stats:
-            updates[key] = stats
-    print(f"Extracted stats/summary for {len(updates)} patterns.")
-    merge_yaml(Path(args.out), updates)
-    print(f"Merged into {args.out}.")
+        if not stats:
+            continue
+        raw_updates[key] = stats
+        if _is_sane(stats):
+            sane_updates[key] = stats
+    print(f"Extracted raw stats for {len(raw_updates)} patterns; {len(sane_updates)} pass sanity bounds.")
+    review_path = Path(args.out).with_name("patterns_extracted.yaml")
+    review_path.write_text(yaml.safe_dump(raw_updates, sort_keys=False))
+    print(f"Raw extraction (for manual review) written to {review_path}.")
+    if args.apply:
+        merge_yaml(Path(args.out), sane_updates)
+        print(f"Merged sane stats into {args.out}.")
+    else:
+        print(f"Pass --apply to merge sane stats into {args.out}.")
 
     if args.chroma:
         maybe_index_chroma(chapters, Path(args.chroma))

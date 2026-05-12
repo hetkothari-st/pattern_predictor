@@ -59,6 +59,31 @@ async def bars(symbol: str = Query(...), tf: str = Query("1m")) -> dict:
     return {"bars": [b.model_dump() for b in stream.snapshot()]}
 
 
+@app.get("/api/watchlist")
+async def watchlist() -> dict:
+    """Return all (symbol, tf) streams the engine has seen, plus the
+    highest-confidence active detection per stream so the sidebar can show
+    a live status dot per symbol.
+    """
+    items = []
+    for (symbol, tf), _stream in store._streams.items():  # type: ignore[attr-defined]
+        memo = engine._memo_for(symbol, tf)
+        active = list(memo.active.values())
+        top = max(active, key=lambda d: d.confidence, default=None)
+        items.append(
+            {
+                "symbol": symbol,
+                "tf": tf,
+                "top_pattern": top.pattern if top else None,
+                "top_direction": top.direction if top else None,
+                "top_confidence": top.confidence if top else None,
+                "top_status": top.status if top else None,
+            }
+        )
+    items.sort(key=lambda x: (x["symbol"], x["tf"]))
+    return {"items": items}
+
+
 @app.post("/api/tick")
 async def post_tick(tick: Tick, tf: str = Query("1m")) -> dict:
     """Inject a tick into the running engine. Used by the replay tool and any
