@@ -1,0 +1,155 @@
+# Seeded canonical metadata. These prose summaries and trade rules are
+# placeholders to be overwritten by `python -m app.knowledge.ingest_book`
+# once the user runs it against their PDF. The numeric fields here are
+# approximate magnitudes for known patterns; do NOT cite them publicly —
+# replace them with values extracted from the user's edition of the book.
+
+head_and_shoulders:
+  direction: bearish
+  summary: >-
+    Three peaks with the middle (head) higher than the two shoulders.
+    Confirmed when price closes below the neckline drawn between the troughs.
+  entry_rule: Short on a close below the neckline; consider a pullback re-entry.
+  target_rule: Measured move = head height projected down from the neckline break.
+  stop_rule: Above the right shoulder, or above the head for tighter signals.
+  success_rate: 0.63
+  avg_move: 0.16
+  throwback_pct: 0.50
+  source_quote: "Populate from book during ingest."
+
+inverse_head_and_shoulders:
+  direction: bullish
+  summary: >-
+    Mirror of head-and-shoulders: three troughs with a lower middle trough.
+    Confirmed on a close above the neckline.
+  entry_rule: Long on a close above the neckline.
+  target_rule: Measured move = head depth projected up from the neckline break.
+  stop_rule: Below the right shoulder.
+  success_rate: 0.74
+  avg_move: 0.38
+  throwback_pct: 0.45
+  source_quote: "Populate from book during ingest."
+
+double_top:
+  direction: bearish
+  summary: >-
+    Two highs at similar prices separated by a moderate trough. Confirmed when
+    price closes below the trough low.
+  entry_rule: Short on a close below the intervening trough.
+  target_rule: Height of the pattern projected down from the breakout.
+  stop_rule: Above the higher of the two tops.
+  success_rate: 0.65
+  avg_move: 0.20
+  throwback_pct: 0.61
+
+double_bottom:
+  direction: bullish
+  summary: >-
+    Two lows at similar prices separated by a moderate peak. Confirmed when
+    price closes above the peak high.
+  entry_rule: Long on a close above the intervening peak.
+  target_rule: Height of the pattern projected up from the breakout.
+  stop_rule: Below the lower of the two bottoms.
+  success_rate: 0.70
+  avg_move: 0.38
+  throwback_pct: 0.59
+
+ascending_triangle:
+  direction: bullish
+  summary: Flat upper resistance with rising lows; bullish bias on a close above resistance.
+  entry_rule: Long on a close above the horizontal resistance.
+  target_rule: Height of the triangle projected up from the breakout.
+  stop_rule: Below the most recent higher low.
+  success_rate: 0.63
+  avg_move: 0.35
+  throwback_pct: 0.57
+
+descending_triangle:
+  direction: bearish
+  summary: Flat lower support with falling highs; bearish bias on a close below support.
+  entry_rule: Short on a close below the horizontal support.
+  target_rule: Height of the triangle projected down from the breakout.
+  stop_rule: Above the most recent lower high.
+  success_rate: 0.54
+  avg_move: 0.16
+  throwback_pct: 0.54
+
+symmetric_triangle:
+  direction: bullish
+  summary: Converging trendlines; trades in the direction of the breakout.
+  entry_rule: Trade the breakout direction; wait for a close beyond the trendline.
+  target_rule: Height of the triangle at its widest projected from the breakout.
+  stop_rule: Inside the opposite trendline.
+  success_rate: 0.58
+  avg_move: 0.25
+  throwback_pct: 0.37
+
+rising_wedge:
+  direction: bearish
+  summary: Both bounds rise but converge; resolution tends to the downside.
+  entry_rule: Short on a close below the lower trendline.
+  target_rule: Project the wedge height down from the break.
+  stop_rule: Above the most recent high inside the wedge.
+  success_rate: 0.69
+  avg_move: 0.17
+  throwback_pct: 0.63
+
+falling_wedge:
+  direction: bullish
+  summary: Both bounds fall but converge; resolution tends to the upside.
+  entry_rule: Long on a close above the upper trendline.
+  target_rule: Project the wedge height up from the break.
+  stop_rule: Below the most recent low inside the wedge.
+  success_rate: 0.68
+  avg_move: 0.32
+  throwback_pct: 0.56
+
+bull_flag:
+  direction: bullish
+  summary: Short downward channel following a sharp upward "pole"; continuation pattern.
+  entry_rule: Long on a close above the upper channel line.
+  target_rule: Project the pole height up from the breakout.
+  stop_rule: Below the channel low.
+  success_rate: 0.64
+  avg_move: 0.23
+  throwback_pct: 0.43
+
+bear_flag:
+  direction: bearish
+  summary: Short upward channel following a sharp downward "pole"; continuation pattern.
+  entry_rule: Short on a close below the lower channel line.
+  target_rule: Project the pole height down from the breakout.
+  stop_rule: Above the channel high.
+  success_rate: 0.60
+  avg_move: 0.19
+  throwback_pct: 0.45
+
+bull_pennant:
+  direction: bullish
+  summary: Mini-triangle consolidation after a sharp upward pole; continuation.
+  entry_rule: Long on a close above the pennant's upper line.
+  target_rule: Project the pole height up from the breakout.
+  stop_rule: Below the pennant low.
+  success_rate: 0.62
+  avg_move: 0.20
+  throwback_pct: 0.47
+
+bear_pennant:
+  direction: bearish
+  summary: Mini-triangle consolidation after a sharp downward pole; continuation.
+  entry_rule: Short on a close below the pennant's lower line.
+  target_rule: Project the pole height down from the breakout.
+  stop_rule: Above the pennant high.
+  success_rate: 0.61
+  avg_move: 0.17
+  throwback_pct: 0.46
+
+cup_with_handle:
+  direction: bullish
+  summary: U-shaped cup with a small pullback (handle) before breakout.
+  entry_rule: Long on a close above the rims/handle high.
+  target_rule: Cup depth projected up from the breakout.
+  stop_rule: Below the handle low.
+  success_rate: 0.62
+  avg_move: 0.34
+  throwback_pct: 0.58
