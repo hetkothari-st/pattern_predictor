@@ -13,7 +13,7 @@ from sqlmodel import Session, func, select
 from .bars import store
 from .config import settings
 from .learning.outcomes import PredictionRow, _get_engine
-from .messages import WSOut
+from .messages import Tick, WSOut
 from .state import engine
 from .ws_broadcast import hub
 from .ws_ingest import run_ingest
@@ -56,6 +56,15 @@ async def health() -> dict:
 async def bars(symbol: str = Query(...), tf: str = Query("1m")) -> dict:
     stream = store.get(symbol, tf)
     return {"bars": [b.model_dump() for b in stream.snapshot()]}
+
+
+@app.post("/api/tick")
+async def post_tick(tick: Tick, tf: str = Query("1m")) -> dict:
+    """Inject a tick into the running engine. Used by the replay tool and any
+    external producer that doesn't speak the WS ingest protocol.
+    """
+    await engine.on_tick(tick, tf=tf)
+    return {"ok": True}
 
 
 @app.get("/api/performance")
