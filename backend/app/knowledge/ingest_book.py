@@ -93,6 +93,31 @@ def parse_pdf_to_chapters(pdf_path: Path) -> list[tuple[str, str]]:
     return [(t, body) for t, body in chapters if t in PATTERN_ALIASES]
 
 
+_NOISE_HINTS = (
+    "figure ",
+    "table ",
+    "chapter ",
+    "page ",
+    "see chapter",
+    "© ",
+)
+
+
+def _is_clean_sentence(s: str) -> bool:
+    s_stripped = s.strip()
+    if len(s_stripped) < 30:
+        return False
+    # Reject obvious page chrome / TOC fragments.
+    low = s_stripped.lower()
+    if any(h in low for h in _NOISE_HINTS):
+        return False
+    # Reject sentences dominated by non-letters (figure captions, axis labels).
+    letters = sum(c.isalpha() for c in s_stripped)
+    if letters / len(s_stripped) < 0.55:
+        return False
+    return True
+
+
 def extract_stats(body: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
     m = PAT_SUCCESS.search(body)
@@ -104,11 +129,11 @@ def extract_stats(body: str) -> dict[str, Any]:
     m = PAT_THROWBACK.search(body)
     if m:
         out["throwback_pct"] = int(m.group(2)) / 100.0
-    # First couple of sentences as a summary.
-    sentences = re.split(r"(?<=[.!?])\s+", body.strip())
-    if sentences:
-        out["summary"] = " ".join(sentences[:2]).strip()[:400]
-        out["source_quote"] = sentences[min(2, len(sentences) - 1)][:300]
+    # Intentionally do NOT overwrite summary/source_quote here. The seeded
+    # prose in patterns.yaml is curated; PDF text extraction reliably leaks
+    # page numbers, figure captions, and TOC fragments that read worse than
+    # the seed and look bad in the Guidance card. Only the numeric stats
+    # (success_rate, avg_move, throwback_pct) come from the book.
     return out
 
 
