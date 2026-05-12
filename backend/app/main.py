@@ -12,10 +12,11 @@ from sqlmodel import Session, func, select
 
 from .bars import store
 from .config import settings
-from .knowledge.rag import get_guidance
+from .knowledge.rag import book_insight, get_guidance
 from .learning.outcomes import PredictionRow, _get_engine
 from .messages import Tick, WSOut
 from .state import engine
+from .symbols import list_symbols
 from .ws_broadcast import hub
 from .ws_ingest import run_ingest
 
@@ -28,7 +29,14 @@ async def lifespan(app: FastAPI):
     async def sink(tick):
         await engine.on_tick(tick, tf=settings.default_timeframe)
 
-    task = asyncio.create_task(run_ingest(sink), name="price-ingest")
+    if settings.price_ws_url:
+        task = asyncio.create_task(run_ingest(sink), name="price-ingest")
+    else:
+        # No live feed configured — pump a demo random-walk so the chart
+        # still moves on a real clock.
+        from .demo_feed import run_demo
+
+        task = asyncio.create_task(run_demo(sink), name="demo-feed")
     try:
         yield
     finally:
@@ -51,6 +59,19 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True}
+
+
+@app.get("/api/symbols")
+async def symbols() -> dict:
+    return {"items": list_symbols()}
+
+
+@app.get("/api/insight")
+async def insight(pattern: str = Query(...)) -> dict:
+    """Book-derived RAG insight for the given pattern. Empty {} if Chroma
+    isn't loaded yet."""
+    facets = book_insight(pattern) or {}
+    return {"pattern": pattern, "facets": facets}
 
 
 @app.get("/api/bars")

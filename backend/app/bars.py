@@ -77,6 +77,18 @@ class BarStream:
             out.append(self.forming.bar)
         return out
 
+    def bootstrap(self, bars: list[Bar]) -> None:
+        """Seed the closed deque with prior history. Skips bars whose ts the
+        stream already has so re-bootstrapping is idempotent."""
+        if not bars:
+            return
+        existing = {b.ts for b in self.closed}
+        for b in bars:
+            if b.ts in existing:
+                continue
+            self.closed.append(b)
+            existing.add(b.ts)
+
 
 class BarStore:
     """Map of (symbol, tf) -> BarStream."""
@@ -87,7 +99,13 @@ class BarStore:
     def get(self, symbol: str, tf: str) -> BarStream:
         key = (symbol, tf)
         if key not in self._streams:
-            self._streams[key] = BarStream(symbol=symbol, tf=tf)
+            stream = BarStream(symbol=symbol, tf=tf)
+            # Late import: recorder imports settings, which imports bars in
+            # some test setups — keep the cycle lazy.
+            from .recorder import load_recorded
+
+            stream.bootstrap(load_recorded(symbol, tf))
+            self._streams[key] = stream
         return self._streams[key]
 
 

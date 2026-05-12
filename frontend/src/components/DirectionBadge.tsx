@@ -2,36 +2,32 @@ import { useStore } from "../state/store";
 
 export function DirectionBadge() {
   const detections = useStore((s) => s.detections);
-  const top = Object.values(detections)
-    .sort((a, b) => b.confidence - a.confidence)[0];
+  const top = Object.values(detections).sort((a, b) => b.confidence - a.confidence)[0];
+
   if (!top) {
     return (
-      <div style={badge("#30363d")}>
-        <strong>No active pattern</strong>
-        <span style={{ opacity: 0.7 }}>watching the tape</span>
+      <div className="badge">
+        <div className="badge-icon">·</div>
+        <div className="badge-body">
+          <div className="badge-pat">No active pattern</div>
+          <div className="badge-meta">watching tape</div>
+        </div>
       </div>
     );
   }
-  const color = top.direction === "bullish" ? "#238636" : "#a40e26";
+
+  const cls = top.direction === "bullish" ? "bull" : "bear";
+  const arrow = top.direction === "bullish" ? "▲" : "▼";
+
   return (
-    <div style={badge(color)}>
-      <strong>{top.direction.toUpperCase()}</strong>
-      <span>
-        {top.pattern.replaceAll("_", " ")} — {(top.confidence * 100).toFixed(0)}%{" "}
-        ({top.status})
-      </span>
+    <div className={`badge ${cls}`}>
+      <div className="badge-icon">{arrow}</div>
+      <div className="badge-body">
+        <div className="badge-pat">{top.pattern.replaceAll("_", " ")}</div>
+        <div className="badge-meta">
+          <b>{(top.confidence * 100).toFixed(0)}%</b> · {top.status}
+        </div>
+      </div>
     </div>
   );
-}
-
-function badge(bg: string): React.CSSProperties {
-  return {
-    background: bg,
-    padding: "10px 14px",
-    borderRadius: 8,
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
-    minWidth: 220,
-  };
 }

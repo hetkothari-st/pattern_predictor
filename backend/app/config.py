@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # so live runs accumulate a training corpus for app.ml.train.
     record_ohlcv: bool = False
     ohlcv_dir: str = "../data/ohlcv"
+    chroma_dir: str = "../data/chroma"
+    chroma_collection: str = "bulkowski"
 
 
 settings = Settings()

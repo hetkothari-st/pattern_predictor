@@ -33,67 +33,53 @@ export function Watchlist() {
     };
   }, []);
 
-  if (items.length === 0) {
-    return (
-      <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>
-        No streams yet. Subscribe via MT_SUBSCRIPTIONS or POST a tick.
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: 8, borderBottom: "1px solid #30363d" }}>
-      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4, letterSpacing: 0.5 }}>
-        WATCHLIST
+    <section className="aside-section">
+      <div className="section-head">
+        <span className="section-head-bar" />
+        <span className="section-title">Watchlist</span>
+        <span className="section-count">{items.length}</span>
       </div>
-      {items.map((it) => {
-        const active = it.symbol === symbol && it.tf === tf;
-        const dotColor =
-          it.top_direction === "bullish"
-            ? "#3fb950"
-            : it.top_direction === "bearish"
-              ? "#f85149"
-              : "#30363d";
-        return (
-          <button
-            key={`${it.symbol}-${it.tf}`}
-            onClick={() => setSymbolTf(it.symbol, it.tf)}
-            style={{
-              display: "flex",
-              width: "100%",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 8px",
-              marginBottom: 2,
-              background: active ? "#1f2937" : "transparent",
-              border: "1px solid",
-              borderColor: active ? "#3b82f6" : "transparent",
-              borderRadius: 4,
-              color: "#e6edf3",
-              cursor: "pointer",
-              textAlign: "left",
-              fontSize: 13,
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: dotColor,
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ flex: 1, fontWeight: 500 }}>{it.symbol}</span>
-            <span style={{ opacity: 0.5, fontSize: 11 }}>{it.tf}</span>
-            {it.top_confidence !== null && (
-              <span style={{ opacity: 0.7, fontSize: 11 }}>
-                {(it.top_confidence * 100).toFixed(0)}%
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+
+      {items.length === 0 ? (
+        <div className="empty">
+          No streams subscribed. Configure <code>MT_SUBSCRIPTIONS</code> or POST a tick to begin.
+        </div>
+      ) : (
+        <>
+          <div className="wl-head">
+            <span />
+            <span>Symbol</span>
+            <span>TF</span>
+            <span>Conf</span>
+          </div>
+          <div>
+            {items.map((it) => {
+              const active = it.symbol === symbol && it.tf === tf;
+              const dotCls =
+                it.top_direction === "bullish"
+                  ? "dot bull"
+                  : it.top_direction === "bearish"
+                    ? "dot bear"
+                    : "dot idle";
+              return (
+                <button
+                  key={`${it.symbol}-${it.tf}`}
+                  onClick={() => setSymbolTf(it.symbol, it.tf)}
+                  className={`wl-row ${active ? "active" : ""}`}
+                >
+                  <span className={dotCls} />
+                  <span className="wl-sym">{it.symbol}</span>
+                  <span className="wl-tf">{it.tf}</span>
+                  <span className="wl-conf">
+                    {it.top_confidence !== null ? `${(it.top_confidence * 100).toFixed(0)}%` : "—"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
   );
 }

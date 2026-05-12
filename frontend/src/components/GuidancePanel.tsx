@@ -10,55 +10,69 @@ export function GuidancePanel() {
   const top = completed[0];
 
   return (
-    <div style={{ padding: 12, borderTop: "1px solid #1f2937", overflowY: "auto" }}>
-      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: 0.5 }}>
-        GUIDANCE
+    <section className="aside-section">
+      <div className="section-head">
+        <span className="section-head-bar" />
+        <span className="section-title">Playbook</span>
       </div>
-      {!top && (
-        <div style={{ opacity: 0.5, fontSize: 13 }}>No completed pattern yet.</div>
-      )}
+      {!top && <div className="empty">No completed pattern in this session.</div>}
       {top && <Card detection={top} guidance={guidanceMap[top.pattern]} />}
-    </div>
+    </section>
   );
 }
 
 function Card({ detection, guidance }: { detection: Detection; guidance?: Guidance }) {
+  const dirCls = detection.direction === "bullish" ? "bull" : "bear";
   return (
-    <div style={{ background: "#161b22", borderRadius: 6, padding: 10, fontSize: 13 }}>
-      <div style={{ marginBottom: 6 }}>
-        <strong>{detection.pattern.replaceAll("_", " ")}</strong>{" "}
-        <span style={{ opacity: 0.7 }}>({detection.direction})</span>
-      </div>
-      {!guidance && (
-        <div style={{ opacity: 0.6 }}>
-          Bulkowski guidance not loaded. Run the book-ingest CLI to populate this card.
+    <article className="guide">
+      <header className="guide-head">
+        <div>
+          <div className="guide-title">{detection.pattern.replaceAll("_", " ")}</div>
+          <div className="guide-dir">Completed · {detection.direction}</div>
         </div>
-      )}
-      {guidance && (
-        <>
-          <Row label="Summary" value={guidance.summary} />
-          <Row label="Entry" value={guidance.entry_rule} />
-          <Row label="Target" value={guidance.target_rule} />
-          <Row label="Stop" value={guidance.stop_rule} />
-          <Row
-            label="Historical success"
-            value={`${(guidance.success_rate * 100).toFixed(0)}% (avg move ${(guidance.avg_move * 100).toFixed(0)}%, throwback ${(guidance.throwback_pct * 100).toFixed(0)}%)`}
-            highlight
-          />
-          <div style={{ opacity: 0.55, fontStyle: "italic", marginTop: 6 }}>
-            {guidance.source_quote}
+        <span className={`guide-stamp ${dirCls}`}>{detection.direction}</span>
+      </header>
+      <div className="guide-body">
+        {!guidance && (
+          <div className="empty" style={{ padding: "8px 0" }}>
+            Bulkowski guidance not loaded. Run the book-ingest CLI to populate this card.
           </div>
-        </>
-      )}
-    </div>
+        )}
+        {guidance && (
+          <>
+            <Row label="Summary" value={guidance.summary} />
+            <Row label="Entry" value={guidance.entry_rule} />
+            <Row label="Target" value={guidance.target_rule} />
+            <Row label="Stop" value={guidance.stop_rule} />
+
+            <div className="guide-stats">
+              <div className="guide-stat accent">
+                <span className="guide-stat-label">Success</span>
+                <span className="guide-stat-val">{(guidance.success_rate * 100).toFixed(0)}%</span>
+              </div>
+              <div className="guide-stat">
+                <span className="guide-stat-label">Avg Move</span>
+                <span className="guide-stat-val">{(guidance.avg_move * 100).toFixed(0)}%</span>
+              </div>
+              <div className="guide-stat">
+                <span className="guide-stat-label">Throwback</span>
+                <span className="guide-stat-val">{(guidance.throwback_pct * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+
+            <div className="guide-quote">{guidance.source_quote}</div>
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 
-function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ marginBottom: 4 }}>
-      <span style={{ opacity: 0.7 }}>{label}: </span>
-      <span style={highlight ? { color: "#d29922", fontWeight: 600 } : undefined}>{value}</span>
+    <div className="guide-row">
+      <span className="guide-label">{label}</span>
+      <span className="guide-value">{value}</span>
     </div>
   );
 }

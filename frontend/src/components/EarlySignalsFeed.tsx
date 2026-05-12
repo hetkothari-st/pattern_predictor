@@ -5,33 +5,27 @@ export function EarlySignalsFeed() {
   const forming = Object.values(detections)
     .filter((d) => d.status === "forming")
     .sort((a, b) => b.confidence - a.confidence);
+
   return (
-    <div style={{ padding: 12, overflow: "auto", flex: 1, borderTop: "1px solid #1f2937" }}>
-      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: 0.5 }}>
-        WATCHING FOR
+    <section className="aside-section flex">
+      <div className="section-head">
+        <span className="section-head-bar" />
+        <span className="section-title">Watching For</span>
+        <span className="section-count">{forming.length}</span>
       </div>
-      {forming.length === 0 && (
-        <div style={{ opacity: 0.5, fontSize: 13 }}>Nothing pre-pattern right now.</div>
-      )}
-      {forming.map((d) => (
-        <div
-          key={d.id}
-          style={{
-            padding: "6px 8px",
-            marginBottom: 4,
-            background: "#161b22",
-            borderLeft: `3px solid ${d.direction === "bullish" ? "#3fb950" : "#f85149"}`,
-            borderRadius: 4,
-            fontSize: 13,
-          }}
-        >
-          <div>
-            {d.pattern.replaceAll("_", " ")} —{" "}
-            <strong>{(d.confidence * 100).toFixed(0)}%</strong>
+      <div className="section-body">
+        {forming.length === 0 && <div className="empty">Nothing pre-pattern right now.</div>}
+        {forming.map((d) => (
+          <div key={d.id} className={`signal ${d.direction === "bullish" ? "bull" : "bear"}`}>
+            <div>
+              <div className="signal-name">{d.pattern.replaceAll("_", " ")}</div>
+              <div className="signal-meta">{d.direction} · forming</div>
+            </div>
+            <span className="signal-conf">{(d.confidence * 100).toFixed(0)}%</span>
+            {d.notes && <div className="signal-note">{d.notes}</div>}
           </div>
-          {d.notes && <div style={{ opacity: 0.6, fontSize: 12 }}>{d.notes}</div>}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </section>
   );
 }

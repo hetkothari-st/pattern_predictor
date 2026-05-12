@@ -1,112 +1,204 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Chart } from "./components/Chart";
 import { DirectionBadge } from "./components/DirectionBadge";
 import { EarlySignalsFeed } from "./components/EarlySignalsFeed";
 import { GuidancePanel } from "./components/GuidancePanel";
+import { BookInsight } from "./components/BookInsight";
+import { RobotWidget } from "./components/RobotWidget";
+import { SymbolPicker } from "./components/SymbolPicker";
 import { Watchlist } from "./components/Watchlist";
 import { useStore } from "./state/store";
 import { connectStream } from "./lib/ws";
+
+type Theme = "dark" | "light";
+
+const THEME_KEY = "sentinel.theme";
+
+function fmtPrice(p: number | undefined) {
+  if (p === undefined || !Number.isFinite(p)) return "—";
+  const abs = Math.abs(p);
+  if (abs >= 1000) return p.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (abs >= 1) return p.toFixed(4);
+  return p.toFixed(6);
+}
 
 export function App() {
   const symbol = useStore((s) => s.symbol);
   const tf = useStore((s) => s.tf);
   const setSymbolTf = useStore((s) => s.setSymbolTf);
-  const [draftSymbol, setDraftSymbol] = useState(symbol);
-  const [draftTf, setDraftTf] = useState(tf);
+  const bars = useStore((s) => s.bars);
+  const [now, setNow] = useState(new Date());
+  const [theme, setTheme] = useState<Theme>(() => {
+    const stored = (typeof window !== "undefined" && localStorage.getItem(THEME_KEY)) as Theme | null;
+    if (stored === "light" || stored === "dark") return stored;
+    return "dark";
+  });
 
   useEffect(() => {
-    setDraftSymbol(symbol);
-    setDraftTf(tf);
-  }, [symbol, tf]);
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     const stop = connectStream(symbol, tf);
     return stop;
   }, [symbol, tf]);
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const stats = useMemo(() => {
+    if (bars.length === 0) return null;
+    const last = bars[bars.length - 1];
+    const prev = bars.length > 1 ? bars[bars.length - 2] : last;
+    const change = last.close - prev.close;
+    const pct = prev.close ? (change / prev.close) * 100 : 0;
+    const window = bars.slice(-60);
+    const hi = Math.max(...window.map((b) => b.high));
+    const lo = Math.min(...window.map((b) => b.low));
+    const vol = window.reduce((s, b) => s + (b.volume ?? 0), 0);
+    return { last, change, pct, hi, lo, vol };
+  }, [bars]);
+
+  const live = bars.length > 0;
+  const dir = stats && stats.change >= 0 ? "bull-c" : "bear-c";
+
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "grid",
-        gridTemplateRows: "auto 1fr",
-        gridTemplateColumns: "1fr 340px",
-        background: "#0b0f17",
-        color: "#e6edf3",
-        fontFamily:
-          "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          gridColumn: "1 / span 2",
-          padding: "10px 16px",
-          borderBottom: "1px solid #1f2937",
-          background: "#0d1117",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <strong style={{ fontSize: 14, letterSpacing: 0.3 }}>
-          <span style={{ color: "#3b82f6" }}>◆</span> Chart Pattern Intelligence
-        </strong>
-        <div style={{ width: 1, height: 20, background: "#1f2937", margin: "0 4px" }} />
-        <input
-          value={draftSymbol}
-          onChange={(e) => setDraftSymbol(e.target.value.toUpperCase())}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") setSymbolTf(draftSymbol, draftTf);
-          }}
-          style={inp}
-          placeholder="symbol"
-        />
-        <select value={draftTf} onChange={(e) => setDraftTf(e.target.value)} style={inp}>
-          {["1m", "5m", "15m", "1h", "4h", "1d"].map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <button onClick={() => setSymbolTf(draftSymbol, draftTf)} style={btn}>
-          Apply
-        </button>
-        <div style={{ flex: 1 }} />
+    <div className="shell">
+      <header className="toolbar rise">
+        <div className="brand">
+          <div className="brand-mark">S</div>
+          <div className="brand-col">
+            <span className="brand-name">Sentinel</span>
+            <span className="brand-sub">Pattern Intelligence</span>
+          </div>
+        </div>
+
+        <SymbolPicker />
+
+        <span className="toolbar-sep" />
+
         <DirectionBadge />
+
+        <span className="toolbar-spacer" />
+
+        <button
+          className="icon-btn"
+          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+        </button>
       </header>
-      <main style={{ position: "relative", minWidth: 0, minHeight: 0 }}>
-        <Chart />
+
+      <div className="tape rise rise-1">
+        <div className="tape-sym">
+          <span className="tape-sym-name">{symbol}</span>
+          <span className="tape-sym-tf">{tf}</span>
+        </div>
+
+        <div className="tape-stats">
+          <Stat label="Last" value={fmtPrice(stats?.last.close)} cls={dir} />
+          <Stat
+            label="Chg"
+            value={
+              stats
+                ? `${stats.change >= 0 ? "+" : ""}${fmtPrice(stats.change)} (${stats.pct >= 0 ? "+" : ""}${stats.pct.toFixed(2)}%)`
+                : "—"
+            }
+            cls={dir}
+          />
+          <Stat label="Open" value={fmtPrice(stats?.last.open)} />
+          <Stat label="High" value={fmtPrice(stats?.hi)} />
+          <Stat label="Low" value={fmtPrice(stats?.lo)} />
+          <Stat
+            label="Vol"
+            value={stats ? stats.vol.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}
+          />
+        </div>
+
+        <div className="tape-clock">
+          <span className={`live-dot ${live ? "" : "idle"}`} />
+          <span>{now.toISOString().substring(11, 19)} UTC</span>
+        </div>
+      </div>
+
+      <main className="chart-area rise rise-2">
+        <div className="chart-toolbar">
+          {(["1m", "5m", "15m", "1h", "4h", "1d"] as const).map((v) => (
+            <button
+              key={v}
+              className={`tf-pill ${tf === v ? "on" : ""}`}
+              onClick={() => setSymbolTf(symbol, v)}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+        <div className="chart-canvas">
+          <Chart theme={theme} />
+          <RobotWidget />
+        </div>
       </main>
-      <aside
-        style={{
-          borderLeft: "1px solid #1f2937",
-          background: "#0d1117",
-          display: "flex",
-          flexDirection: "column",
-          minHeight: 0,
-        }}
-      >
+
+      <aside className="aside rise rise-3">
         <Watchlist />
         <EarlySignalsFeed />
         <GuidancePanel />
+        <BookInsight />
       </aside>
+
+      <footer className="statusbar">
+        <div className={`statusbar-item ${live ? "ok" : ""}`}>
+          <span className={`live-dot ${live ? "" : "idle"}`} />
+          <span>Feed</span>
+          <b>{live ? "Connected" : "Idle"}</b>
+        </div>
+        <div className="statusbar-item">
+          <span>Bars</span>
+          <b>{bars.length}</b>
+        </div>
+        <div className="statusbar-item">
+          <span>Tape</span>
+          <b>{symbol} · {tf}</b>
+        </div>
+        <span className="statusbar-spacer" />
+        <div className="statusbar-item">
+          <span>Engine</span>
+          <b>v0.1</b>
+        </div>
+        <div className="statusbar-item">
+          <span>{now.toLocaleTimeString("en-GB", { hour12: false })}</span>
+        </div>
+      </footer>
     </div>
   );
 }
 
-const inp: React.CSSProperties = {
-  background: "#161b22",
-  color: "#e6edf3",
-  border: "1px solid #30363d",
-  borderRadius: 6,
-  padding: "5px 10px",
-  fontSize: 13,
-  outline: "none",
-};
-const btn: React.CSSProperties = {
-  ...inp,
-  cursor: "pointer",
-  background: "#1f6feb",
-  borderColor: "#1f6feb",
-  fontWeight: 500,
-};
+function Stat({ label, value, cls }: { label: string; value: string; cls?: string }) {
+  return (
+    <div className="tape-stat">
+      <span className="tape-stat-label">{label}</span>
+      <span className={`tape-stat-val ${cls ?? ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}

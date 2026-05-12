@@ -15,7 +15,7 @@ interface StoreState {
 }
 
 export const useStore = create<StoreState>((set) => ({
-  symbol: "BTCUSDT",
+  symbol: "NIFTY50",
   tf: "1m",
   bars: [],
   detections: {},

@@ -1,7 +1,9 @@
-"""Append closed bars to per-(symbol, tf) CSV files.
+"""Append closed bars to per-(symbol, tf) CSV files and read them back.
 
 Wired from `Engine.on_tick` so every bar that crosses its boundary lands on
-disk. Files become the training corpus consumed by `app.ml.train`.
+disk. Files become the training corpus consumed by `app.ml.train` and the
+bootstrap source so a fresh chart shows everything since market open instead
+of starting empty.
 
 Header is written once on file creation: `ts,open,high,low,close,volume`.
 """
@@ -28,6 +30,37 @@ def _path_for(symbol: str, tf: str) -> Path:
     base.mkdir(parents=True, exist_ok=True)
     safe_symbol = "".join(c if c.isalnum() else "_" for c in symbol)
     return base / f"{safe_symbol}_{tf}.csv"
+
+
+def load_recorded(symbol: str, tf: str) -> list[Bar]:
+    """Return previously recorded bars for this stream, or [] if none."""
+    path = _path_for(symbol, tf)
+    if not path.exists():
+        return []
+    bars: list[Bar] = []
+    try:
+        with path.open() as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    bars.append(
+                        Bar(
+                            symbol=symbol,
+                            tf=tf,
+                            ts=float(row["ts"]),
+                            open=float(row["open"]),
+                            high=float(row["high"]),
+                            low=float(row["low"]),
+                            close=float(row["close"]),
+                            volume=float(row.get("volume", 0.0) or 0.0),
+                            closed=True,
+                        )
+                    )
+                except (KeyError, ValueError, TypeError):
+                    continue
+    except OSError as exc:
+        log.warning("could not read %s: %s", path, exc)
+    return bars
 
 
 def record_bar(bar: Bar) -> None:
