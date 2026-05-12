@@ -97,31 +97,34 @@ export function Chart() {
       if (d.anchors.length >= 2) {
         const minPrice = Math.min(...d.anchors.map((a) => a.price));
         const maxPrice = Math.max(...d.anchors.map((a) => a.price));
-        const area = chart.addAreaSeries({
-          topColor: color,
-          bottomColor: color,
-          lineColor: color,
-          priceLineVisible: false,
-          lastValueVisible: false,
-        });
-        area.setData([
-          { time: d.start_ts as Time, value: maxPrice },
-          { time: d.end_ts as Time, value: maxPrice },
-        ]);
-        overlayRef.current.bands.push(area);
-        // A second area at the bottom of the band, so the shading reads as a rectangle.
-        const areaBot = chart.addAreaSeries({
-          topColor: color,
-          bottomColor: color,
-          lineColor: color,
-          priceLineVisible: false,
-          lastValueVisible: false,
-        });
-        areaBot.setData([
-          { time: d.start_ts as Time, value: minPrice },
-          { time: d.end_ts as Time, value: minPrice },
-        ]);
-        overlayRef.current.bands.push(areaBot);
+        const t0 = Math.min(d.start_ts, d.end_ts);
+        const t1 = Math.max(d.start_ts, d.end_ts);
+        if (t1 > t0) {
+          const area = chart.addAreaSeries({
+            topColor: color,
+            bottomColor: color,
+            lineColor: color,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          });
+          area.setData([
+            { time: t0 as Time, value: maxPrice },
+            { time: t1 as Time, value: maxPrice },
+          ]);
+          overlayRef.current.bands.push(area);
+          const areaBot = chart.addAreaSeries({
+            topColor: color,
+            bottomColor: color,
+            lineColor: color,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          });
+          areaBot.setData([
+            { time: t0 as Time, value: minPrice },
+            { time: t1 as Time, value: minPrice },
+          ]);
+          overlayRef.current.bands.push(areaBot);
+        }
       }
 
       // Connect anchors with a thin line so the structure is visible.
@@ -153,6 +156,7 @@ export function Chart() {
       });
     });
 
+    markers.sort((a, b) => (a.time as number) - (b.time as number));
     candleRef.current?.setMarkers(markers);
   }, [activeDetections]);
 
