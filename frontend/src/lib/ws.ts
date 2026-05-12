@@ -16,7 +16,7 @@ export function connectStream(symbol: string, tf: string): () => void {
       try {
         const msg = JSON.parse(ev.data) as WSMessage;
         const s = useStore.getState();
-        if (msg.type === "snapshot") s.applySnapshot(msg.payload.bars);
+        if (msg.type === "snapshot") s.applySnapshot(msg.payload.bars, msg.payload.detections, msg.payload.guidance);
         else if (msg.type === "bar") s.applyBar(msg.payload);
         else if (msg.type === "detection") s.applyDetection(msg.payload);
         else if (msg.type === "guidance") s.applyGuidance(msg.payload);

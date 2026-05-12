@@ -12,6 +12,7 @@ from sqlmodel import Session, func, select
 
 from .bars import store
 from .config import settings
+from .knowledge.rag import get_guidance
 from .learning.outcomes import PredictionRow, _get_engine
 from .messages import Tick, WSOut
 from .state import engine
@@ -93,10 +94,26 @@ async def performance() -> dict:
 async def ws_stream(ws: WebSocket, symbol: str = Query(...), tf: str = Query("1m")) -> None:
     await ws.accept()
     await hub.subscribe(ws, symbol, tf)
-    # Send a snapshot of existing bars so the chart paints immediately.
+    # Send a snapshot of existing bars + active detections so the chart paints
+    # immediately and prior pattern overlays survive a page reload.
     stream = store.get(symbol, tf)
     snapshot = [b.model_dump() for b in stream.snapshot()]
-    await ws.send_text(WSOut(type="snapshot", payload={"bars": snapshot}).model_dump_json())
+    memo = engine._memo_for(symbol, tf)
+    active = [d.model_dump() for d in memo.active.values()]
+    guidance = []
+    seen_patterns: set[str] = set()
+    for d in memo.active.values():
+        if d.status == "completed" and d.pattern not in seen_patterns:
+            g = get_guidance(d.pattern)
+            if g is not None:
+                guidance.append(g)
+                seen_patterns.add(d.pattern)
+    await ws.send_text(
+        WSOut(
+            type="snapshot",
+            payload={"bars": snapshot, "detections": active, "guidance": guidance},
+        ).model_dump_json()
+    )
     try:
         while True:
             # We don't expect client messages today; keep the connection open.

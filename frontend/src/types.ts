@@ -42,7 +42,7 @@ export interface Guidance {
 }
 
 export type WSMessage =
-  | { type: "snapshot"; payload: { bars: Bar[] } }
+  | { type: "snapshot"; payload: { bars: Bar[]; detections?: Detection[]; guidance?: Guidance[] } }
   | { type: "bar"; payload: Bar }
   | { type: "detection"; payload: Detection }
   | { type: "guidance"; payload: Guidance };
