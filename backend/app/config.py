@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # critic endpoint returns a "disabled" verdict).
     anthropic_api_key: str = ""
     critic_model: str = "claude-opus-4-7"
+    # Auto-retrain loop. Off by default — training is heavy; opt-in.
+    retrain_enabled: bool = False
+    retrain_interval_h: float = 24.0
 
 
 settings = Settings()

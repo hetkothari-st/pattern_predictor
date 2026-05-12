@@ -5,6 +5,7 @@ import { EarlySignalsFeed } from "./components/EarlySignalsFeed";
 import { GuidancePanel } from "./components/GuidancePanel";
 import { BookInsight } from "./components/BookInsight";
 import { CriticPanel } from "./components/CriticPanel";
+import { DriftPanel } from "./components/DriftPanel";
 import { RobotWidget } from "./components/RobotWidget";
 import { SymbolPicker } from "./components/SymbolPicker";
 import { Watchlist } from "./components/Watchlist";
@@ -220,6 +221,9 @@ export function App() {
           </Section>
           <Section title="Critic" count={null}>
             <CriticPanel />
+          </Section>
+          <Section title="Drift" count={null}>
+            <DriftPanel />
           </Section>
         </div>
       </aside>

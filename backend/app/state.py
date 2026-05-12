@@ -68,10 +68,15 @@ class Engine:
             if bar.closed:
                 record_bar(bar)
                 # Aggregate this tick into all relevant higher timeframes so
-                # the multi-TF confirmation has bars to read against.
+                # the multi-TF confirmation has bars to read against. Higher
+                # TFs also record their own closed bars to disk so retrain
+                # has multi-resolution data, not just the base TF.
                 for higher_tf in HIGHER_TFS.values():
                     higher_stream = store.get(tick.symbol, higher_tf)
-                    higher_stream.ingest(tick)
+                    higher_emitted = higher_stream.ingest(tick)
+                    for hb in higher_emitted:
+                        if hb.closed:
+                            record_bar(hb)
         if any(b.closed for b in emitted_bars):
             # Run detectors only on bar-close to keep CPU bounded.
             await self._run_detectors(tick.symbol, tf, stream.snapshot())

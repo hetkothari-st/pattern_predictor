@@ -13,6 +13,7 @@ from sqlmodel import Session, func, select
 from .bars import store
 from .config import settings
 from .critic import critique
+from .drift import report as drift_report
 from .knowledge.rag import book_insight, get_guidance
 from .learning.outcomes import PredictionRow, _get_engine
 from .messages import Tick, WSOut
@@ -30,22 +31,35 @@ async def lifespan(app: FastAPI):
     async def sink(tick):
         await engine.on_tick(tick, tf=settings.default_timeframe)
 
+    tasks: list[asyncio.Task] = []
     if settings.price_ws_url:
-        task = asyncio.create_task(run_ingest(sink), name="price-ingest")
+        tasks.append(asyncio.create_task(run_ingest(sink), name="price-ingest"))
     else:
-        # No live feed configured — pump a demo random-walk so the chart
-        # still moves on a real clock.
         from .demo_feed import run_demo
 
-        task = asyncio.create_task(run_demo(sink), name="demo-feed")
+        tasks.append(asyncio.create_task(run_demo(sink), name="demo-feed"))
+
+    if settings.retrain_enabled:
+        from .learning.retrain import retrain_loop
+
+        tasks.append(
+            asyncio.create_task(
+                retrain_loop(interval_h=settings.retrain_interval_h),
+                name="retrain-loop",
+            )
+        )
+        log.info("retrain loop enabled (every %.1fh)", settings.retrain_interval_h)
+
     try:
         yield
     finally:
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):
-            pass
+        for t in tasks:
+            t.cancel()
+        for t in tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 app = FastAPI(title="Chart Pattern Intelligence", lifespan=lifespan)
@@ -73,6 +87,12 @@ async def insight(pattern: str = Query(...)) -> dict:
     isn't loaded yet."""
     facets = book_insight(pattern) or {}
     return {"pattern": pattern, "facets": facets}
+
+
+@app.get("/api/drift")
+async def drift(recent_n: int = Query(50), threshold: float = Query(0.10)) -> dict:
+    """Per-pattern precision drift over the predictions log."""
+    return drift_report(recent_n=recent_n, threshold=threshold)
 
 
 @app.get("/api/critique")
