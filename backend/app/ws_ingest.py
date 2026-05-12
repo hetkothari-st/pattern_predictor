@@ -53,6 +53,11 @@ async def run_ingest(sink: TickSink, *, url: str | None = None, fmt: str | None 
     if not url:
         log.warning("PRICE_WS_URL not set; ingest disabled. Use the replay tool for offline runs.")
         return
+    if fmt == "mt":
+        from .mt_feed import run_mt_ingest
+
+        await run_mt_ingest(sink, url=url)
+        return
     parse = ADAPTERS.get(fmt, parse_generic)
     backoff = 1.0
     while True:

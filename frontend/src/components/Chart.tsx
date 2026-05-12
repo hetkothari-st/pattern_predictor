@@ -77,7 +77,14 @@ export function Chart() {
     );
   }, [bars]);
 
-  const activeDetections = useMemo(() => Object.values(detections), [detections]);
+  const activeDetections = useMemo(() => {
+    const all = Object.values(detections);
+    const completed = all.filter((d) => d.status === "completed");
+    const forming = all.filter((d) => d.status === "forming");
+    const top = (xs: Detection[], n: number) =>
+      xs.slice().sort((a, b) => b.confidence - a.confidence).slice(0, n);
+    return [...top(completed, 2), ...top(forming, 1)];
+  }, [detections]);
 
   useEffect(() => {
     const chart = chartRef.current;

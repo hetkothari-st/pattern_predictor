@@ -26,6 +26,9 @@ class FlagPennant(PatternDetector):
     name = "flag_pennant"
     POLE_BARS = 10
     CONS_BARS = 12
+    MIN_POLE_MOVE = 0.10  # require 10%+ pole — kills random ramps
+    PARALLEL_TOL = 0.05
+    SLOPE_TRIGGER = 0.15
 
     def detect(self, bars: list[Bar]) -> list[Detection]:
         a = bars_to_arrays(bars)
@@ -37,7 +40,13 @@ class FlagPennant(PatternDetector):
         pole_start = n - self.POLE_BARS - self.CONS_BARS
         pole_end = n - self.CONS_BARS
         pole_move = (close[pole_end - 1] - close[pole_start]) / max(1e-9, abs(close[pole_start]))
-        if abs(pole_move) < 0.04:
+        if abs(pole_move) < self.MIN_POLE_MOVE:
+            return []
+        # Pole must dominate the consolidation: consolidation range must be
+        # smaller than half the pole range, otherwise the "pole" is just noise.
+        pole_range = abs(close[pole_end - 1] - close[pole_start])
+        cons_range = float(np.max(a["high"][pole_end:]) - np.min(a["low"][pole_end:]))
+        if cons_range > 0.5 * pole_range:
             return []
         direction = "bullish" if pole_move > 0 else "bearish"
         cons_lo = a["low"][pole_end:]
@@ -49,12 +58,12 @@ class FlagPennant(PatternDetector):
         s_top, s_bot = m_top / scale, m_bot / scale
 
         # Flag: parallel channel sloping against the pole.
-        is_flag = abs(s_top - s_bot) < 0.1 and (
-            (direction == "bullish" and s_top < -0.05)
-            or (direction == "bearish" and s_top > 0.05)
+        is_flag = abs(s_top - s_bot) < self.PARALLEL_TOL and (
+            (direction == "bullish" and s_top < -self.SLOPE_TRIGGER)
+            or (direction == "bearish" and s_top > self.SLOPE_TRIGGER)
         )
         # Pennant: converging triangle in the consolidation.
-        is_pennant = (s_top < -0.05 and s_bot > 0.05)
+        is_pennant = (s_top < -self.SLOPE_TRIGGER and s_bot > self.SLOPE_TRIGGER)
         if not is_flag and not is_pennant:
             return []
         kind = ("bull_" if direction == "bullish" else "bear_") + ("flag" if is_flag else "pennant")
@@ -75,9 +84,11 @@ class FlagPennant(PatternDetector):
             AnchorPoint(ts=float(ts[pole_end - 1]), price=float(close[pole_end - 1]), label="pole end"),
             AnchorPoint(ts=float(ts[-1]), price=last_close, label="current"),
         ]
+        # Stable id keyed only on the pole start: a sliding window must not
+        # spawn a fresh detection every bar — it should update the same one.
         return [
             Detection(
-                id=_id(kind, [ts[pole_start], ts[-1]]),
+                id=_id(kind, [ts[pole_start]]),
                 pattern=kind,
                 direction=direction,  # type: ignore[arg-type]
                 status=status,

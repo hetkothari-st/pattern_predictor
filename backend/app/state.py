@@ -124,9 +124,17 @@ class Engine:
         except Exception as exc:  # noqa: BLE001
             log.warning("score_outcomes failed: %s", exc)
 
-        # Drop stale "forming" detections that no longer fire.
+        # Drop stale "forming" detections that no longer fire, and evict
+        # completed detections that have aged out of the visible window —
+        # otherwise overlays accumulate forever as new bars arrive.
+        last_ts = float(bars[-1].ts) if bars else 0.0
+        # Keep completed detections for ~60 bars worth of time after their end.
+        keep_window_s = 60 * 60  # 60 minutes on a 1m chart; plenty for context
         for stale_id in list(memo.active.keys()):
-            if stale_id not in seen and memo.active[stale_id].status == "forming":
+            d = memo.active[stale_id]
+            if stale_id not in seen and d.status == "forming":
+                del memo.active[stale_id]
+            elif d.status == "completed" and last_ts - d.end_ts > keep_window_s:
                 del memo.active[stale_id]
 
 
