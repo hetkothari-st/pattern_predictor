@@ -43,16 +43,25 @@ def build_model(in_channels: int = 5, n_classes: int = len(PATTERN_CLASSES)) -> 
         def __init__(self) -> None:
             super().__init__()
             self.backbone = nn.Sequential(
-                nn.Conv1d(in_channels, 32, kernel_size=5, padding=2),
+                nn.Conv1d(in_channels, 32, kernel_size=7, padding=3),
+                nn.BatchNorm1d(32),
                 nn.ReLU(),
                 nn.Conv1d(32, 64, kernel_size=5, padding=2),
+                nn.BatchNorm1d(64),
                 nn.ReLU(),
                 nn.MaxPool1d(2),
-                nn.Conv1d(64, 128, kernel_size=3, padding=1),
+                nn.Dropout(0.2),
+                nn.Conv1d(64, 128, kernel_size=5, padding=2),
+                nn.BatchNorm1d(128),
                 nn.ReLU(),
                 nn.MaxPool1d(2),
+                nn.Dropout(0.3),
+                nn.Conv1d(128, 128, kernel_size=3, padding=1),
+                nn.BatchNorm1d(128),
+                nn.ReLU(),
                 nn.AdaptiveAvgPool1d(1),
                 nn.Flatten(),
+                nn.Dropout(0.4),
             )
             self.pattern_head = nn.Linear(128, n_classes)
             self.early_head = nn.Linear(128, n_classes)

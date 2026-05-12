@@ -18,20 +18,24 @@ interface ChartProps {
 
 const PALETTE = {
   dark: {
-    bg: "#131722",
-    text: "#9aa0a6",
-    grid: "#1e222d",
-    border: "#2a2e39",
-    bull: "#26a69a",
-    bear: "#ef5350",
+    bg: "#0a0c10",
+    text: "#a7abb2",
+    grid: "#1a1e26",
+    border: "#353c48",
+    crosshair: "#c9ccd3",
+    crosshairLabelBg: "#1c2129",
+    bull: "#1ad17d",
+    bear: "#ff3b4d",
   },
   light: {
     bg: "#ffffff",
-    text: "#5d6571",
-    grid: "#e0e3eb",
-    border: "#c9ccd3",
-    bull: "#089981",
-    bear: "#f23645",
+    text: "#404853",
+    grid: "#e5e8ec",
+    border: "#a8adb6",
+    crosshair: "#404853",
+    crosshairLabelBg: "#e7ebf0",
+    bull: "#008f5a",
+    bear: "#e8243a",
   },
 };
 
@@ -61,8 +65,20 @@ export function Chart({ theme }: ChartProps) {
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: p.border, style: LineStyle.Dotted, width: 1 },
-        horzLine: { color: p.border, style: LineStyle.Dotted, width: 1 },
+        vertLine: {
+          color: p.crosshair,
+          style: LineStyle.Dashed,
+          width: 1,
+          labelVisible: true,
+          labelBackgroundColor: p.crosshairLabelBg,
+        },
+        horzLine: {
+          color: p.crosshair,
+          style: LineStyle.Dashed,
+          width: 1,
+          labelVisible: true,
+          labelBackgroundColor: p.crosshairLabelBg,
+        },
       },
       rightPriceScale: {
         borderColor: p.border,

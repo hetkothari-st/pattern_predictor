@@ -141,6 +141,17 @@ def bull_flag() -> list[Bar]:
     return from_prices(base, noise=0.1)
 
 
+def bear_flag() -> list[Bar]:
+    """Mirror of bull_flag — sharp downward pole, slight upward channel,
+    breakdown on the final bar."""
+    base = []
+    base += _ramp(110, 90, 10)              # downward pole
+    for i in range(11):
+        base.append(90 + 0.4 * i + (1 if i % 2 == 0 else -1))
+    base.append(base[-1] - 4)               # breakdown on the final bar
+    return from_prices(base, noise=0.1)
+
+
 def cup_with_handle() -> list[Bar]:
     base = []
     # Left rim
