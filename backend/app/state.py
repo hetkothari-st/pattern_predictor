@@ -12,6 +12,7 @@ import hashlib
 
 from .bars import store
 from .detectors.registry import REGISTRY
+from .ensemble import apply_to_detection
 from .knowledge.rag import get_guidance
 from .learning.outcomes import log_detection, score_outcomes
 from .messages import AnchorPoint, Bar, Detection, Tick, WSOut
@@ -20,6 +21,10 @@ from .recorder import record_bar
 from .ws_broadcast import hub
 
 EARLY_THRESHOLD = 0.55  # min ML probability to emit a "watching for X" signal
+HIGHER_TFS: dict[str, str] = {"1m": "5m", "5m": "15m", "15m": "1h", "1h": "4h"}
+# Drop completed detections whose ensemble confidence falls below this floor —
+# nothing low-conviction goes to the UI.
+ENSEMBLE_MIN_CONFIDENCE = 0.35
 PATTERN_DIRECTION: dict[str, str] = {
     "head_and_shoulders": "bearish",
     "inverse_head_and_shoulders": "bullish",
@@ -62,6 +67,11 @@ class Engine:
             )
             if bar.closed:
                 record_bar(bar)
+                # Aggregate this tick into all relevant higher timeframes so
+                # the multi-TF confirmation has bars to read against.
+                for higher_tf in HIGHER_TFS.values():
+                    higher_stream = store.get(tick.symbol, higher_tf)
+                    higher_stream.ingest(tick)
         if any(b.closed for b in emitted_bars):
             # Run detectors only on bar-close to keep CPU bounded.
             await self._run_detectors(tick.symbol, tf, stream.snapshot())
@@ -69,6 +79,14 @@ class Engine:
     async def _run_detectors(self, symbol: str, tf: str, bars: list[Bar]) -> None:
         memo = self._memo_for(symbol, tf)
         seen: set[str] = set()
+        # Pre-compute ML probs once for this bar; ensemble reuses them.
+        ml = ml_infer.infer(bars)
+        # Higher-TF context — used by ensemble for confirmation alignment.
+        higher_tf = HIGHER_TFS.get(tf)
+        higher_bars = (
+            store.get(symbol, higher_tf).snapshot() if higher_tf else None
+        )
+
         for det_cls in REGISTRY:
             detector = det_cls()
             try:
@@ -77,6 +95,29 @@ class Engine:
                 log.exception("Detector %s failed: %s", det_cls.__name__, exc)
                 continue
             for d in detections:
+                ml_prob = (ml or {}).get("pattern", {}).get(d.pattern) if ml else None
+                fusion = apply_to_detection(
+                    d, bars, ml_probability=ml_prob, higher_bars=higher_bars
+                )
+                # Volume / TF gate: drop completed detections we have no
+                # conviction in. Forming detections still flow because the UI
+                # already filters them by confidence client-side.
+                if d.status == "completed" and fusion.confidence < ENSEMBLE_MIN_CONFIDENCE:
+                    continue
+                d = d.model_copy(
+                    update={
+                        "confidence": fusion.confidence,
+                        "notes": (
+                            d.notes
+                            + (
+                                f" | fusion: " + ", ".join(
+                                    f"{k}×{v:.2f}" if k != "rule" else f"rule={v:.2f}"
+                                    for k, v in fusion.factors.items()
+                                )
+                            )
+                        ).strip(" |"),
+                    }
+                )
                 seen.add(d.id)
                 prev = memo.active.get(d.id)
                 if prev is None or prev.status != d.status or prev.confidence != d.confidence:
@@ -95,8 +136,8 @@ class Engine:
                                 symbol, tf, WSOut(type="guidance", payload=guidance)
                             )
         # ML early-warning: emit "watching for X" when ML is confident and no
-        # rule detector has already flagged this pattern.
-        ml = ml_infer.infer(bars)
+        # rule detector has already flagged this pattern. (`ml` already
+        # computed once at the top of this method.)
         if ml is not None:
             covered = {memo.active[i].pattern for i in seen}
             for pattern, prob in ml["early"].items():
