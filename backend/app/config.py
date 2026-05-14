@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # Auto-retrain loop. Off by default — training is heavy; opt-in.
     retrain_enabled: bool = False
     retrain_interval_h: float = 24.0
+    # When true, the price WS ingest only runs during NSE market hours
+    # (Mon-Fri 09:15-15:30 IST, NSE holidays excluded). Outside that window
+    # the demo feed (or nothing) runs so the chart stays alive.
+    market_hours_only: bool = False
 
 
 settings = Settings()

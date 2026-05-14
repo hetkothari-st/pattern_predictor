@@ -151,6 +151,8 @@ export function Chart({ theme }: ChartProps) {
     const markers: Parameters<ISeriesApi<"Candlestick">["setMarkers"]>[0] = [];
 
     activeDetections.forEach((d: Detection) => {
+      const lineColor = d.direction === "bullish" ? p.bull : p.bear;
+
       if (d.anchors.length >= 2) {
         const seen = new Set<number>();
         const points = d.anchors
@@ -165,9 +167,9 @@ export function Chart({ theme }: ChartProps) {
           .map((a) => ({ time: a.ts as Time, value: a.price }));
         if (points.length >= 2) {
           const line = chart.addLineSeries({
-            color: d.direction === "bullish" ? p.bull : p.bear,
-            lineWidth: 1,
-            lineStyle: d.status === "completed" ? LineStyle.Solid : LineStyle.LargeDashed,
+            color: lineColor,
+            lineWidth: 3,
+            lineStyle: d.status === "completed" ? LineStyle.Solid : LineStyle.Dashed,
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,
@@ -175,6 +177,20 @@ export function Chart({ theme }: ChartProps) {
           try {
             line.setData(points);
             overlayRef.current.lines.push(line);
+            // Highlight neckline / mid anchor for completed double-tops/bottoms.
+            if (d.status === "completed") {
+              const mid = d.anchors.find((a) => /confirm|neck|breakout/i.test(a.label));
+              if (mid && Number.isFinite(mid.price)) {
+                line.createPriceLine({
+                  price: mid.price,
+                  color: lineColor,
+                  lineWidth: 1,
+                  lineStyle: LineStyle.Dotted,
+                  axisLabelVisible: true,
+                  title: mid.label || "neckline",
+                });
+              }
+            }
           } catch {
             try {
               chart.removeSeries(line);
@@ -185,13 +201,30 @@ export function Chart({ theme }: ChartProps) {
         }
       }
 
+      // Anchor dots — visible on chart so user sees pattern being drawn.
+      // Skip last anchor on completed (arrow marker replaces it).
+      const lastIdx = d.anchors.length - 1;
+      const anchorPos: "aboveBar" | "belowBar" =
+        d.direction === "bullish" ? "belowBar" : "aboveBar";
+      d.anchors.forEach((a, idx) => {
+        if (!Number.isFinite(a.ts) || !Number.isFinite(a.price)) return;
+        if (d.status === "completed" && idx === lastIdx) return;
+        markers.push({
+          time: a.ts as Time,
+          position: anchorPos,
+          color: lineColor,
+          shape: "circle",
+          text: a.label || String(idx + 1),
+        });
+      });
+
       if (d.status === "completed" && d.anchors.length > 0) {
         const tip = d.anchors[d.anchors.length - 1];
         if (Number.isFinite(tip.ts)) {
           markers.push({
             time: tip.ts as Time,
             position: d.direction === "bullish" ? "belowBar" : "aboveBar",
-            color: d.direction === "bullish" ? p.bull : p.bear,
+            color: lineColor,
             shape: d.direction === "bullish" ? "arrowUp" : "arrowDown",
             text: d.pattern.replaceAll("_", " "),
           });

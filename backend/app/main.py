@@ -33,7 +33,18 @@ async def lifespan(app: FastAPI):
 
     tasks: list[asyncio.Task] = []
     if settings.price_ws_url:
-        tasks.append(asyncio.create_task(run_ingest(sink), name="price-ingest"))
+        if settings.market_hours_only:
+            from .scheduler import market_hours_loop
+
+            async def factory():
+                await run_ingest(sink)
+
+            tasks.append(
+                asyncio.create_task(market_hours_loop(factory), name="market-hours-ingest")
+            )
+            log.info("price ingest gated by NSE market hours (09:15–15:30 IST)")
+        else:
+            tasks.append(asyncio.create_task(run_ingest(sink), name="price-ingest"))
     else:
         from .demo_feed import run_demo
 
