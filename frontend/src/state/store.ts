@@ -7,7 +7,11 @@ interface StoreState {
   bars: Bar[];
   detections: Record<string, Detection>;
   guidance: Record<string, Guidance>;
+  // "live" = follow the WS stream; anything else = static historical view
+  // (see HistoryPicker for valid values: "today", "1d", "7d", ..., "YYYY-MM-DD").
+  historyMode: string;
   setSymbolTf: (symbol: string, tf: string) => void;
+  setHistoryMode: (mode: string) => void;
   applySnapshot: (bars: Bar[], detections?: Detection[], guidance?: Guidance[]) => void;
   applyBar: (b: Bar) => void;
   applyDetection: (d: Detection) => void;
@@ -20,7 +24,10 @@ export const useStore = create<StoreState>((set) => ({
   bars: [],
   detections: {},
   guidance: {},
-  setSymbolTf: (symbol, tf) => set({ symbol, tf, bars: [], detections: {}, guidance: {} }),
+  historyMode: "live",
+  setSymbolTf: (symbol, tf) =>
+    set({ symbol, tf, bars: [], detections: {}, guidance: {}, historyMode: "live" }),
+  setHistoryMode: (mode) => set({ historyMode: mode, bars: [], detections: {}, guidance: {} }),
   applySnapshot: (bars, detections, guidance) =>
     set({
       bars,

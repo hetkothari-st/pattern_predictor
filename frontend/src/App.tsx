@@ -8,6 +8,7 @@ import { CriticPanel } from "./components/CriticPanel";
 import { DriftPanel } from "./components/DriftPanel";
 import { RobotWidget } from "./components/RobotWidget";
 import { SymbolPicker } from "./components/SymbolPicker";
+import { HistoryPicker } from "./components/HistoryPicker";
 import { Watchlist } from "./components/Watchlist";
 import { useStore } from "./state/store";
 import { connectStream } from "./lib/ws";
@@ -50,10 +51,12 @@ export function App() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
+  const historyMode = useStore((s) => s.historyMode);
   useEffect(() => {
+    if (historyMode !== "live") return;  // historical view = no WS
     const stop = connectStream(symbol, tf);
     return stop;
-  }, [symbol, tf]);
+  }, [symbol, tf, historyMode]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -99,6 +102,7 @@ export function App() {
 
         <div className="toolbar-zone">
           <SymbolPicker />
+          <HistoryPicker />
         </div>
 
         <div className="toolbar-zone flex">

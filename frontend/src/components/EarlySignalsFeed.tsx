@@ -4,10 +4,20 @@ import { useStore } from "../state/store";
 // peak-triplet candidates that aren't real patterns.
 const MIN_CONFIDENCE = 0.5;
 const MAX_DISPLAY = 5;
+const RECENCY_BARS = 20;
 
 export function EarlySignalsFeed() {
   const detections = useStore((s) => s.detections);
-  const all = Object.values(detections).filter((d) => d.status === "forming");
+  const bars = useStore((s) => s.bars);
+  const lastBarTs = bars.length ? bars[bars.length - 1].ts : 0;
+  const tfSeconds =
+    bars.length >= 2
+      ? Math.max(1, bars[bars.length - 1].ts - bars[bars.length - 2].ts)
+      : 60;
+  const recencyCutoff = lastBarTs - tfSeconds * RECENCY_BARS;
+  const all = Object.values(detections).filter(
+    (d) => d.status === "forming" && d.end_ts >= recencyCutoff
+  );
   // Keep one entry per pattern (highest confidence) so the same pattern
   // doesn't repeat 6 times.
   const seen = new Set<string>();

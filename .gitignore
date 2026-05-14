@@ -13,6 +13,8 @@ data/bulkowski.pdf
 data/chroma/
 data/sample.csv
 data/ohlcv/
+data/ml/
+data/models/archive/
 .DS_Store
 .playwright-mcp/
 verify_pattern.png

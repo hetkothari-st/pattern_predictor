@@ -14,6 +14,7 @@ from .bars import store
 from .config import settings
 from .critic import critique
 from .drift import report as drift_report
+from .history import bars_in_range, day_to_range, period_to_range, trading_days
 from .knowledge.rag import book_insight, get_guidance
 from .learning.outcomes import PredictionRow, _get_engine
 from .messages import Tick, WSOut
@@ -131,6 +132,45 @@ async def critique_endpoint(
 async def bars(symbol: str = Query(...), tf: str = Query("1m")) -> dict:
     stream = store.get(symbol, tf)
     return {"bars": [b.model_dump() for b in stream.snapshot()]}
+
+
+@app.get("/api/bars/range")
+async def bars_range(
+    symbol: str = Query(...),
+    tf: str = Query("1m"),
+    day: str | None = Query(None, description="YYYY-MM-DD (IST)"),
+    period: str | None = Query(None, description="1d|7d|30d|90d|1y"),
+    start_ts: float | None = Query(None),
+    end_ts: float | None = Query(None),
+) -> dict:
+    """Return historical bars from the recorded CSV in a date window.
+    Resolution priority: explicit start_ts/end_ts > day > period."""
+    if day:
+        start_ts, end_ts = day_to_range(day)
+    elif period:
+        try:
+            start_ts, end_ts = period_to_range(period)
+        except ValueError as exc:
+            return {"error": str(exc), "bars": []}
+    bars = bars_in_range(symbol, tf, start_ts, end_ts)
+    return {
+        "symbol": symbol,
+        "tf": tf,
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+        "bars": [b.model_dump() for b in bars],
+    }
+
+
+@app.get("/api/days")
+async def days(
+    symbol: str = Query(...),
+    tf: str = Query("1m"),
+    limit: int = Query(60),
+) -> dict:
+    """Return up to `limit` recent IST calendar days for which we have
+    recorded bars. Newest first."""
+    return {"symbol": symbol, "tf": tf, "days": trading_days(symbol, tf, limit=limit)}
 
 
 @app.get("/api/watchlist")

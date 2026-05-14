@@ -79,17 +79,29 @@ export function RobotWidget() {
 
   const { mood, top } = useMemo(() => {
     const all = Object.values(detections);
+    const lastBarTs = bars.length ? bars[bars.length - 1].ts : 0;
+    const tfSeconds =
+      bars.length >= 2
+        ? Math.max(1, bars[bars.length - 1].ts - bars[bars.length - 2].ts)
+        : 60;
+    const recencyCutoff = lastBarTs - tfSeconds * 20;
+
     const completed = all
-      .filter((d) => d.status === "completed")
+      .filter((d) => d.status === "completed" && d.end_ts >= recencyCutoff)
       .sort((a, b) => b.end_ts - a.end_ts)[0];
     if (completed) return { mood: "found" as Mood, top: completed };
     const forming = all
-      .filter((d) => d.status === "forming" && d.confidence >= 0.5)
+      .filter(
+        (d) =>
+          d.status === "forming" &&
+          d.confidence >= 0.5 &&
+          d.end_ts >= recencyCutoff
+      )
       .sort((a, b) => b.confidence - a.confidence)[0];
     if (forming) return { mood: "thinking" as Mood, top: forming };
     if (bars.length > 0) return { mood: "scanning" as Mood, top: undefined };
     return { mood: "idle" as Mood, top: undefined };
-  }, [detections, bars.length]);
+  }, [detections, bars]);
 
   const [palette, setPalette] = useState({
     bull: "#1ad17d",

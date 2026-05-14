@@ -127,14 +127,25 @@ export function Chart({ theme }: ChartProps) {
 
   const activeDetections = useMemo(() => {
     const all = Object.values(detections);
+    // Forming patterns are only meaningful if the last anchor is recent —
+    // otherwise the backend is holding onto a candidate that never broke its
+    // neckline and the chart shows a dashed line on stale candles.
+    const lastBarTs = bars.length ? bars[bars.length - 1].ts : 0;
+    const recencyWindowBars = 20;
+    const tfSeconds = (() => {
+      if (bars.length < 2) return 60;
+      return Math.max(1, bars[bars.length - 1].ts - bars[bars.length - 2].ts);
+    })();
+    const recencyCutoff = lastBarTs - tfSeconds * recencyWindowBars;
+
     const completed = all
       .filter((d) => d.status === "completed")
       .sort((a, b) => b.confidence - a.confidence);
     const forming = all
-      .filter((d) => d.status === "forming")
+      .filter((d) => d.status === "forming" && d.end_ts >= recencyCutoff)
       .sort((a, b) => b.confidence - a.confidence);
     return [...completed.slice(0, 1), ...forming.slice(0, 1)];
-  }, [detections]);
+  }, [detections, bars]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -150,84 +161,86 @@ export function Chart({ theme }: ChartProps) {
     overlayRef.current = { lines: [] };
     const markers: Parameters<ISeriesApi<"Candlestick">["setMarkers"]>[0] = [];
 
+    const drawLine = (
+      pts: { time: Time; value: number }[],
+      color: string,
+      status: "completed" | "forming",
+      thin = false
+    ) => {
+      if (pts.length < 2) return;
+      const line = chart.addLineSeries({
+        color,
+        lineWidth: thin ? 1 : 2,
+        lineStyle: status === "completed" ? LineStyle.Solid : LineStyle.Dashed,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      try {
+        line.setData(pts);
+        overlayRef.current.lines.push(line);
+      } catch {
+        try { chart.removeSeries(line); } catch { /* noop */ }
+      }
+    };
+
+    const toPoints = (anchors: typeof activeDetections[0]["anchors"]) => {
+      const seen = new Set<number>();
+      return anchors
+        .slice()
+        .sort((a, b) => a.ts - b.ts)
+        .filter((a) => {
+          if (!Number.isFinite(a.ts) || !Number.isFinite(a.price)) return false;
+          if (seen.has(a.ts)) return false;
+          seen.add(a.ts);
+          return true;
+        })
+        .map((a) => ({ time: a.ts as Time, value: a.price }));
+    };
+
     activeDetections.forEach((d: Detection) => {
       const lineColor = d.direction === "bullish" ? p.bull : p.bear;
 
-      if (d.anchors.length >= 2) {
-        const seen = new Set<number>();
-        const points = d.anchors
-          .slice()
-          .sort((a, b) => a.ts - b.ts)
-          .filter((a) => {
-            if (!Number.isFinite(a.ts) || !Number.isFinite(a.price)) return false;
-            if (seen.has(a.ts)) return false;
-            seen.add(a.ts);
-            return true;
-          })
-          .map((a) => ({ time: a.ts as Time, value: a.price }));
-        if (points.length >= 2) {
-          const line = chart.addLineSeries({
-            color: lineColor,
-            lineWidth: 3,
-            lineStyle: d.status === "completed" ? LineStyle.Solid : LineStyle.Dashed,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          try {
-            line.setData(points);
-            overlayRef.current.lines.push(line);
-            // Highlight neckline / mid anchor for completed double-tops/bottoms.
-            if (d.status === "completed") {
-              const mid = d.anchors.find((a) => /confirm|neck|breakout/i.test(a.label));
-              if (mid && Number.isFinite(mid.price)) {
-                line.createPriceLine({
-                  price: mid.price,
-                  color: lineColor,
-                  lineWidth: 1,
-                  lineStyle: LineStyle.Dotted,
-                  axisLabelVisible: true,
-                  title: mid.label || "neckline",
-                });
-              }
-            }
-          } catch {
-            try {
-              chart.removeSeries(line);
-            } catch {
-              /* noop */
-            }
-          }
-        }
+      // Group anchors by structural role so wedges/triangles render as two
+      // converging trendlines instead of a zig-zag polyline.
+      const upper = d.anchors.filter((a) => /upper|peak|head|high|top|shoulder/i.test(a.label));
+      const lower = d.anchors.filter((a) => /lower|trough|bottom|low|neckline|handle/i.test(a.label));
+
+      if (upper.length >= 2 && lower.length >= 2) {
+        drawLine(toPoints(upper), lineColor, d.status);
+        drawLine(toPoints(lower), lineColor, d.status);
+      } else if (/head_and_shoulders/.test(d.pattern)) {
+        // Draw shoulder-head-shoulder profile + dedicated neckline.
+        drawLine(toPoints(d.anchors), lineColor, d.status);
+        const neckline = d.anchors.filter((a) => /neckline/i.test(a.label));
+        if (neckline.length >= 2) drawLine(toPoints(neckline), lineColor, d.status, true);
+      } else {
+        drawLine(toPoints(d.anchors), lineColor, d.status);
       }
 
-      // Anchor dots — visible on chart so user sees pattern being drawn.
-      // Skip last anchor on completed (arrow marker replaces it).
-      const lastIdx = d.anchors.length - 1;
-      const anchorPos: "aboveBar" | "belowBar" =
-        d.direction === "bullish" ? "belowBar" : "aboveBar";
-      d.anchors.forEach((a, idx) => {
-        if (!Number.isFinite(a.ts) || !Number.isFinite(a.price)) return;
-        if (d.status === "completed" && idx === lastIdx) return;
-        markers.push({
-          time: a.ts as Time,
-          position: anchorPos,
-          color: lineColor,
-          shape: "circle",
-          text: a.label || String(idx + 1),
-        });
-      });
-
-      if (d.status === "completed" && d.anchors.length > 0) {
+      // Pattern label at last anchor — arrow + name on completed, circle +
+      // "(forming)" on candidates. One marker per pattern, no anchor dots.
+      if (d.anchors.length > 0) {
         const tip = d.anchors[d.anchors.length - 1];
         if (Number.isFinite(tip.ts)) {
-          markers.push({
-            time: tip.ts as Time,
-            position: d.direction === "bullish" ? "belowBar" : "aboveBar",
-            color: lineColor,
-            shape: d.direction === "bullish" ? "arrowUp" : "arrowDown",
-            text: d.pattern.replaceAll("_", " "),
-          });
+          const name = d.pattern.replaceAll("_", " ");
+          if (d.status === "completed") {
+            markers.push({
+              time: tip.ts as Time,
+              position: d.direction === "bullish" ? "belowBar" : "aboveBar",
+              color: lineColor,
+              shape: d.direction === "bullish" ? "arrowUp" : "arrowDown",
+              text: name.toUpperCase(),
+            });
+          } else {
+            markers.push({
+              time: tip.ts as Time,
+              position: d.direction === "bullish" ? "belowBar" : "aboveBar",
+              color: lineColor,
+              shape: "circle",
+              text: `${name} · forming`,
+            });
+          }
         }
       }
     });
